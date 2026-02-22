@@ -1,6 +1,9 @@
 package com.jokerhub.orzmc
 
+import com.jokerhub.orzmc.util.CompressionKind
+import com.jokerhub.orzmc.util.McaMemoryBuilder
 import com.jokerhub.orzmc.world.*
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
@@ -13,8 +16,8 @@ class MemoryE2ETest {
         val world = java.nio.file.Paths.get("/mem/world")
         fs.createDirectories(world)
         fs.createDirectories(world.resolve("region"))
-        // minimal MCA placeholder (size >= 8192)
-        fs.write(world.resolve("region").resolve("r.0.0.mca"), ByteArray(8192))
+        val data = McaMemoryBuilder.buildSingleEntryMca(0, 1000, CompressionKind.RAW)
+        fs.write(world.resolve("region").resolve("r.0.0.mca"), data)
         val out = java.nio.file.Paths.get("/mem/out")
         val request = OptimizerRequest(
             input = world,
@@ -23,7 +26,8 @@ class MemoryE2ETest {
             io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
         )
         val report = Optimizer.run(request)
-        assertTrue(report.processedChunks >= 0)
+        assertEquals(1, report.processedChunks)
+        assertEquals(0, report.removedChunks)
         val outFile = out.resolve("region").resolve("r.0.0.mca")
         val realDir = fs.toRealPath(out.resolve("region"))
         assertTrue(Files.exists(realDir))

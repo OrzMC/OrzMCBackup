@@ -165,11 +165,12 @@ class OptimizerApiTest {
         }
         assertTrue(mcaCount > 0)
         val events = mutableListOf<ProgressEvent>()
+        val tmpOut = TestTmp.createTempDirectory("optimizer-out-progress-")
         val report = try {
             Optimizer.run(
                 OptimizerRequest(
                     input = input,
-                    output = TestTmp.createTempDirectory("optimizer-out-progress-"),
+                    output = tmpOut,
                     filter = FilterOptions(inhabitedThresholdSeconds = 0),
                     progress = ProgressOptions(
                         interval = 100,
@@ -188,6 +189,8 @@ class OptimizerApiTest {
         assertTrue(events.any { it.stage == ProgressStage.Done })
         assertTrue(events.any { it.stage == ProgressStage.ChunkProgress })
         assertTrue(report.processedChunks > 0)
+        assertTrue(report.errors.isEmpty())
+        Cleaner.deleteTreeWithRetry(tmpOut, 5, 10)
     }
 
     @Test
@@ -202,11 +205,12 @@ class OptimizerApiTest {
         }
         assertTrue(mcaCount > 0)
         val events = mutableListOf<ProgressEvent>()
+        val tmpOut = TestTmp.createTempDirectory("optimizer-out-progress-ms-")
         val report = try {
             Optimizer.run(
                 OptimizerRequest(
                     input = input,
-                    output = TestTmp.createTempDirectory("optimizer-out-progress-ms-"),
+                    output = tmpOut,
                     filter = FilterOptions(inhabitedThresholdSeconds = 0),
                     progress = ProgressOptions(
                         interval = 100000,
@@ -226,5 +230,7 @@ class OptimizerApiTest {
         assertTrue(events.any { it.stage == ProgressStage.Done })
         assertTrue(events.any { it.stage == ProgressStage.ChunkProgress })
         assertTrue(report.processedChunks > 0)
+        assertTrue(report.errors.isEmpty())
+        Cleaner.deleteTreeWithRetry(tmpOut, 5, 10)
     }
 }
