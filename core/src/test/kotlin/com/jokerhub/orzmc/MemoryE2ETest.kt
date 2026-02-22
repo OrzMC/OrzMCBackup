@@ -16,17 +16,13 @@ class MemoryE2ETest {
         // minimal MCA placeholder (size >= 8192)
         fs.write(world.resolve("region").resolve("r.0.0.mca"), ByteArray(8192))
         val out = java.nio.file.Paths.get("/mem/out")
-        val cfg = OptimizerConfig(
+        val request = OptimizerRequest(
             input = world,
             output = out,
-            inhabitedThresholdSeconds = 0,
-            removeUnknown = false,
-            fs = fs,
-            ioFactory = MemoryMcaIOFactory(),
-            progressSink = CallbackProgressSink(null),
-            reportSink = null
+            filter = FilterOptions(inhabitedThresholdSeconds = 0),
+            io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
         )
-        val report = Optimizer.run(cfg)
+        val report = Optimizer.run(request)
         assertTrue(report.processedChunks >= 0)
         val outFile = out.resolve("region").resolve("r.0.0.mca")
         val realDir = fs.toRealPath(out.resolve("region"))

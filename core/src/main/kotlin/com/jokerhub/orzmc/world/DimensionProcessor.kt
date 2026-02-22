@@ -8,7 +8,7 @@ data class DimensionResult(
     val removed: Long
 )
 
-object DimensionProcessor {
+internal object DimensionProcessor {
     fun process(
         fs: FileSystem,
         ioFactory: McaIOFactory,
@@ -16,7 +16,7 @@ object DimensionProcessor {
         targetDim: Path,
         patterns: List<ChunkPattern>,
         onError: (Path, String, String) -> Unit,
-        onProgress: ((ProgressEvent) -> Unit)?,
+        progressSink: ProgressSink,
         totalChunks: Long,
         progressInterval: Long,
         progressIntervalMs: Long,
@@ -31,11 +31,11 @@ object DimensionProcessor {
         fs.createDirectories(targetDim.resolve("region"))
         if (fs.isDirectory(entitiesDir)) fs.createDirectories(targetDim.resolve("entities"))
         if (fs.isDirectory(poiDir)) fs.createDirectories(targetDim.resolve("poi"))
-        onProgress?.invoke(ProgressEvent(ProgressStage.DimensionStart, null, null, inputDim.toString(), null))
+        progressSink.emit(ProgressEvent(ProgressStage.DimensionStart, null, null, inputDim.toString(), null))
         val useTime = progressIntervalMs > 0
         var lastEmit = System.currentTimeMillis()
         fs.list(regionDir).filter { p -> p.toString().endsWith(".mca") }.forEach regionLoop@{ rf ->
-            onProgress?.invoke(ProgressEvent(ProgressStage.RegionStart, null, null, rf.toString(), null))
+            progressSink.emit(ProgressEvent(ProgressStage.RegionStart, null, null, rf.toString(), null))
             if (!McaUtils.isValidMca(fs, rf)) {
                 onError(rf, "MCA", "MCA 文件损坏或不完整")
                 if (!strict) return@regionLoop
@@ -105,11 +105,11 @@ object DimensionProcessor {
                     if (useTime) {
                         val now = System.currentTimeMillis()
                         if (now - lastEmit >= progressIntervalMs) {
-                            onProgress?.invoke(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                            progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
                             lastEmit = now
                         }
                     } else if (progressInterval > 0 && processed % progressInterval == 0L) {
-                        onProgress?.invoke(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                        progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
                     }
                 }
                 try { cw.finalizeFile() } catch (_: Exception) { onError(rf, "Finalize", "完成写入失败") }
@@ -124,7 +124,7 @@ object DimensionProcessor {
                 try { pw?.close() } catch (_: Exception) {}
             }
         }
-        onProgress?.invoke(ProgressEvent(ProgressStage.DimensionEnd, null, null, inputDim.toString(), null))
+        progressSink.emit(ProgressEvent(ProgressStage.DimensionEnd, null, null, inputDim.toString(), null))
         return DimensionResult(processedCounter.get(), removedTotal)
     }
 }

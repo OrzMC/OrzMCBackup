@@ -106,7 +106,7 @@ class Main : Callable<Int> {
 
     override fun call(): Int {
         return try {
-            val sink = reportFile?.let { FileReportSink(it, reportFormat) }
+            val reportSink = reportFile?.let { FileReportSink(it, reportFormat) }
             val progressPrinter: ((ProgressEvent) -> Unit)? = when (progressMode) {
                 ProgressMode.Off -> null
                 else -> { e ->
@@ -163,26 +163,30 @@ class Main : Callable<Int> {
                     }
                 }
             }
-            val config = OptimizerConfig(
+            val progressSink = progressPrinter?.let { CallbackProgressSink(it) } ?: NoopProgressSink
+            val request = OptimizerRequest(
                 input = input,
                 output = output,
-                inhabitedThresholdSeconds = inhabitedTimeSeconds,
-                removeUnknown = removeUnknown,
-                progressMode = progressMode,
-                zipOutput = zipOutput,
-                inPlace = inPlace,
-                force = force,
-                strict = strict,
-                progressInterval = progressInterval,
-                progressIntervalMs = progressIntervalMs,
-                onError = null,
-                onProgress = progressPrinter,
-                parallelism = parallelism,
-                copyMisc = copyMisc,
-                progressSink = null,
-                reportSink = sink
+                filter = FilterOptions(
+                    inhabitedThresholdSeconds = inhabitedTimeSeconds,
+                    removeUnknown = removeUnknown,
+                    strict = strict
+                ),
+                outputOptions = OutputOptions(
+                    inPlace = inPlace,
+                    zipOutput = zipOutput,
+                    force = force,
+                    copyMisc = copyMisc
+                ),
+                progress = ProgressOptions(
+                    interval = progressInterval,
+                    intervalMs = progressIntervalMs,
+                    sink = progressSink
+                ),
+                runtime = RuntimeOptions(parallelism = parallelism),
+                hooks = Hooks(reportSink = reportSink)
             )
-            val r = Optimizer.run(config)
+            val r = Optimizer.run(request)
             if (report) println(ReportIO.toText(r))
             reportFile?.let { path -> println("报告已写入：$path") }
             if (strict && r.errors.isNotEmpty()) 1 else 0

@@ -37,24 +37,16 @@ class OptimizerConfigParamTest {
         assertTrue(mcaCount > 0)
         val out = TestTmp.createTempDirectory("optimizer-config-out-")
         val events = mutableListOf<ProgressEvent>()
-        val config = OptimizerConfig(
+        val request = OptimizerRequest(
             input = input,
             output = out,
-            inhabitedThresholdSeconds = 0,
-            removeUnknown = removeUnknown,
-            progressMode = ProgressMode.Off,
-            zipOutput = false,
-            inPlace = false,
-            force = true,
-            strict = false,
-            progressInterval = 100,
-            onProgress = null,
-            parallelism = parallelism,
-            progressSink = CallbackProgressSink { e -> events.add(e) },
-            reportSink = null
+            filter = FilterOptions(inhabitedThresholdSeconds = 0, removeUnknown = removeUnknown),
+            outputOptions = OutputOptions(force = true),
+            progress = ProgressOptions(interval = 100, sink = CallbackProgressSink { e -> events.add(e) }),
+            runtime = RuntimeOptions(parallelism = parallelism)
         )
         val report = try {
-            Optimizer.run(config)
+            Optimizer.run(request)
         } catch (e: FileSystemException) {
             fsFail(e)
         }

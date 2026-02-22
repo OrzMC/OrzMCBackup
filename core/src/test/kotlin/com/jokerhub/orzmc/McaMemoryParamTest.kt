@@ -28,20 +28,16 @@ class McaMemoryParamTest {
         fs.createDirectories(world)
         fs.createDirectories(world.resolve("region"))
         val method = CompressionKind.valueOf(comp)
-        val bytes = McaMemoryBuilder.buildSingleEntryMca(0, 0, 0, 1000L, method)
+        val bytes = McaMemoryBuilder.buildSingleEntryMca(0, 1000L, method)
         fs.write(world.resolve("region").resolve("r.0.0.mca"), bytes)
         val out = java.nio.file.Paths.get("/mem/out")
-        val cfg = OptimizerConfig(
+        val request = OptimizerRequest(
             input = world,
             output = out,
-            inhabitedThresholdSeconds = threshold,
-            removeUnknown = false,
-            fs = fs,
-            ioFactory = MemoryMcaIOFactory(),
-            progressSink = CallbackProgressSink(null),
-            reportSink = null
+            filter = FilterOptions(inhabitedThresholdSeconds = threshold),
+            io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
         )
-        val report = Optimizer.run(cfg)
+        val report = Optimizer.run(request)
         assertTrue(report.processedChunks >= 1)
         assertEquals(removedExpected, report.removedChunks)
     }

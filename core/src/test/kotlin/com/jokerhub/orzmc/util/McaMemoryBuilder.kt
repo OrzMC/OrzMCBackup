@@ -68,7 +68,7 @@ object McaMemoryBuilder {
         }
     }
 
-    fun buildSingleEntryMca(regionX: Int, regionZ: Int, index: Int, inhabited: Long, kind: CompressionKind): ByteArray {
+    fun buildSingleEntryMca(index: Int, inhabited: Long, kind: CompressionKind): ByteArray {
         val payload = inhabitedTag(inhabited)
         val (method, body) = compress(kind, payload)
         val bos = ByteArrayOutputStream()
@@ -105,7 +105,7 @@ object McaMemoryBuilder {
         return final.toByteArray()
     }
 
-    fun buildMca(regionX: Int, regionZ: Int, chunks: List<MemChunk>): ByteArray {
+    fun buildMca(chunks: List<MemChunk>): ByteArray {
         val loc = ByteArray(4096)
         val bbLoc = ByteBuffer.wrap(loc).order(ByteOrder.BIG_ENDIAN)
         val time = ByteArray(4096)

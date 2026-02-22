@@ -1,8 +1,6 @@
 package com.jokerhub.orzmc
 
-import com.jokerhub.orzmc.world.Optimizer
-import com.jokerhub.orzmc.world.ProgressEvent
-import com.jokerhub.orzmc.world.ProgressStage
+import com.jokerhub.orzmc.world.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -62,22 +60,19 @@ class OptimizerApiTest {
         val tmpOut = TestTmp.createTempDirectory("optimizer-out-")
         val report = try {
             Optimizer.run(
-                com.jokerhub.orzmc.world.OptimizerConfig(
+                OptimizerRequest(
                     input = input,
                     output = tmpOut,
-                    inhabitedThresholdSeconds = 0,
-                    removeUnknown = false,
-                    progressMode = com.jokerhub.orzmc.world.ProgressMode.Off,
-                    zipOutput = false,
-                    inPlace = false,
-                    force = true,
-                    strict = false,
-                    progressInterval = 10,
-                    onProgress = { e ->
-                        if (e.stage == ProgressStage.Discover) {
-                            System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                    outputOptions = OutputOptions(force = true),
+                    progress = ProgressOptions(
+                        interval = 10,
+                        sink = CallbackProgressSink { e ->
+                            if (e.stage == ProgressStage.Discover) {
+                                System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                            }
                         }
-                    }
+                    )
                 )
             )
         } catch (e: FileSystemException) {
@@ -107,22 +102,18 @@ class OptimizerApiTest {
         val tmpOut = TestTmp.createTempDirectory("optimizer-out-bad-")
         val report = try {
             Optimizer.run(
-                com.jokerhub.orzmc.world.OptimizerConfig(
+                OptimizerRequest(
                     input = tmpWorld,
                     output = tmpOut,
-                    inhabitedThresholdSeconds = 0,
-                    removeUnknown = false,
-                    progressMode = com.jokerhub.orzmc.world.ProgressMode.Off,
-                    zipOutput = false,
-                    inPlace = false,
-                    force = false,
-                    strict = true,
-                    progressInterval = 10,
-                    onProgress = { e ->
-                        if (e.stage == ProgressStage.Discover) {
-                            System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0, strict = true),
+                    progress = ProgressOptions(
+                        interval = 10,
+                        sink = CallbackProgressSink { e ->
+                            if (e.stage == ProgressStage.Discover) {
+                                System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                            }
                         }
-                    }
+                    )
                 )
             )
         } catch (e: FileSystemException) {
@@ -148,16 +139,10 @@ class OptimizerApiTest {
         Files.write(tmpOut.resolve("dummy.txt"), "a".toByteArray(Charsets.UTF_8))
         val report = try {
             Optimizer.run(
-                com.jokerhub.orzmc.world.OptimizerConfig(
+                OptimizerRequest(
                     input = input,
                     output = tmpOut,
-                    inhabitedThresholdSeconds = 0,
-                    removeUnknown = false,
-                    progressMode = com.jokerhub.orzmc.world.ProgressMode.Off,
-                    zipOutput = false,
-                    inPlace = false,
-                    force = false,
-                    strict = false
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0)
                 )
             )
         } catch (e: FileSystemException) {
@@ -182,23 +167,19 @@ class OptimizerApiTest {
         val events = mutableListOf<ProgressEvent>()
         val report = try {
             Optimizer.run(
-                com.jokerhub.orzmc.world.OptimizerConfig(
+                OptimizerRequest(
                     input = input,
                     output = TestTmp.createTempDirectory("optimizer-out-progress-"),
-                    inhabitedThresholdSeconds = 0,
-                    removeUnknown = false,
-                    progressMode = com.jokerhub.orzmc.world.ProgressMode.Off,
-                    zipOutput = false,
-                    inPlace = false,
-                    force = false,
-                    strict = false,
-                    progressInterval = 100,
-                    onProgress = { e ->
-                        events.add(e)
-                        if (e.stage == ProgressStage.Discover) {
-                            System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                    progress = ProgressOptions(
+                        interval = 100,
+                        sink = CallbackProgressSink { e ->
+                            events.add(e)
+                            if (e.stage == ProgressStage.Discover) {
+                                System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                            }
                         }
-                    }
+                    )
                 )
             )
         } catch (e: FileSystemException) {
@@ -223,24 +204,20 @@ class OptimizerApiTest {
         val events = mutableListOf<ProgressEvent>()
         val report = try {
             Optimizer.run(
-                com.jokerhub.orzmc.world.OptimizerConfig(
+                OptimizerRequest(
                     input = input,
                     output = TestTmp.createTempDirectory("optimizer-out-progress-ms-"),
-                    inhabitedThresholdSeconds = 0,
-                    removeUnknown = false,
-                    progressMode = com.jokerhub.orzmc.world.ProgressMode.Off,
-                    zipOutput = false,
-                    inPlace = false,
-                    force = false,
-                    strict = false,
-                    progressInterval = 100000, // ensure chunk-based won't fire
-                    progressIntervalMs = 5,
-                    onProgress = { e: ProgressEvent ->
-                        events.add(e)
-                        if (e.stage == ProgressStage.Discover) {
-                            System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                    progress = ProgressOptions(
+                        interval = 100000,
+                        intervalMs = 5,
+                        sink = CallbackProgressSink { e: ProgressEvent ->
+                            events.add(e)
+                            if (e.stage == ProgressStage.Discover) {
+                                System.err.println("DISCOVER: cur=${e.current} tot=${e.total} msg=${e.message}")
+                            }
                         }
-                    }
+                    )
                 )
             )
         } catch (e: FileSystemException) {

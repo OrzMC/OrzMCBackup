@@ -26,23 +26,22 @@ object Optimizer {
     private fun countTotalChunks(fs: FileSystem, dims: List<Path>): Long = McaUtils.countTotalChunks(fs, dims)
 
     @JvmStatic
-    fun run(config: OptimizerConfig): OptimizeReport {
-        val input = config.input
-        val output = config.output
-        val inhabitedThresholdSeconds = config.inhabitedThresholdSeconds
-        val removeUnknown = config.removeUnknown
-        val zipOutput = config.zipOutput
-        val inPlace = config.inPlace
-        val force = config.force
-        val strict = config.strict
-        val progressInterval = config.progressInterval
-        val progressIntervalMs = config.progressIntervalMs
-        val onError = config.onError
-        val progressSink = config.progressSink ?: CallbackProgressSink(config.onProgress)
-        val fs = config.fs
-        val metrics = config.metricsSink ?: NoopMetricsSink()
-        config.loggerSink
-        val parallelism = config.parallelism
+    fun run(request: OptimizerRequest): OptimizeReport {
+        val input = request.input
+        val output = request.output
+        val inhabitedThresholdSeconds = request.filter.inhabitedThresholdSeconds
+        val removeUnknown = request.filter.removeUnknown
+        val zipOutput = request.outputOptions.zipOutput
+        val inPlace = request.outputOptions.inPlace
+        val force = request.outputOptions.force
+        val strict = request.filter.strict
+        val progressInterval = request.progress.interval
+        val progressIntervalMs = request.progress.intervalMs
+        val onError = request.hooks.onError
+        val progressSink = request.progress.sink
+        val fs = request.io.fs
+        val metrics = request.hooks.metricsSink ?: NoopMetricsSink()
+        val parallelism = request.runtime.parallelism
         val errors = mutableListOf<OptimizeError>()
         fun record(path: Path, kind: String, msg: String) {
             val e = OptimizeError(path.toString(), kind, msg)
@@ -61,7 +60,6 @@ object Optimizer {
             progressSink.emit(ProgressEvent(stage, current, total, path?.toString(), message))
         }
 
-        progressIntervalMs > 0
         if (!fs.isDirectory(input)) {
             val msg = "输入目录不存在或不是目录"
             record(input, "Input", msg)
@@ -106,16 +104,16 @@ object Optimizer {
         val totalChunks = McaUtils.countTotalChunks(fs, tasks)
         val processedChunksAtomic = java.util.concurrent.atomic.AtomicLong(0L)
         var removedTotal = 0L
-        val miscTotal = if (!inPlace && config.copyMisc) {
+        val miscTotal = if (!inPlace && request.outputOptions.copyMisc) {
             var c = 0L
             val reserved = setOf("region", "entities", "poi")
             tasks.forEach { dim ->
-                fs.walk(dim).forEach { p ->
-                    if (p == dim) return@forEach
+                for (p in fs.walk(dim)) {
+                    if (p == dim) continue
                     val rel = dim.relativize(p)
-                    if (rel.toString().isEmpty()) return@forEach
+                    if (rel.toString().isEmpty()) continue
                     val top = if (rel.nameCount > 0) rel.getName(0).toString() else ""
-                    if (reserved.contains(top)) return@forEach
+                    if (reserved.contains(top)) continue
                     c += 1
                 }
             }
@@ -125,8 +123,7 @@ object Optimizer {
         val progressTotal = totalChunks + miscTotal + zipSteps
         emit(ProgressStage.Discover, 0, totalChunks, input, "统计区块")
 
-        val onProgressCb: (ProgressEvent) -> Unit = { e -> progressSink.emit(e) }
-        val ioFactory = config.ioFactory
+        val ioFactory = request.io.ioFactory
         if (parallelism <= 1) {
             tasks.forEach { dim ->
                 val rel = input.relativize(dim)
@@ -148,7 +145,7 @@ object Optimizer {
                     targetDim,
                     patterns,
                     { p, k, m -> record(p, k, m) },
-                    onProgressCb,
+                    progressSink,
                     progressTotal,
                     progressInterval,
                     progressIntervalMs,
@@ -183,7 +180,7 @@ object Optimizer {
                         targetDim,
                         patterns,
                         { p, k, m -> record(p, k, m) },
-                        onProgressCb,
+                        progressSink,
                         progressTotal,
                         progressInterval,
                         progressIntervalMs,
@@ -246,7 +243,7 @@ object Optimizer {
                 throw InPlaceReplacementException("清理临时目录失败：${out}", e)
             }
         } else {
-            if (config.copyMisc) {
+            if (request.outputOptions.copyMisc) {
                 val base = processedChunksAtomic.get()
                 emit(ProgressStage.CopyMisc, base, progressTotal, out, "复制杂项文件")
                 var done = 0L
@@ -268,13 +265,13 @@ object Optimizer {
                     val outDim = out.resolve(rel)
                     fs.createDirectories(outDim)
                     val reserved = setOf("region", "entities", "poi")
-                    fs.walk(dim).forEach { p ->
-                        if (p == dim) return@forEach
-                        val rel = dim.relativize(p)
-                        if (rel.toString().isEmpty()) return@forEach
-                        val top = if (rel.nameCount > 0) rel.getName(0).toString() else ""
-                        if (reserved.contains(top)) return@forEach
-                        val target = outDim.resolve(rel)
+                    for (p in fs.walk(dim)) {
+                        if (p == dim) continue
+                        val relPath = dim.relativize(p)
+                        if (relPath.toString().isEmpty()) continue
+                        val top = if (relPath.nameCount > 0) relPath.getName(0).toString() else ""
+                        if (reserved.contains(top)) continue
+                        val target = outDim.resolve(relPath)
                         if (fs.isDirectory(p)) {
                             fs.createDirectories(target)
                             done += 1
@@ -318,16 +315,16 @@ object Optimizer {
         val doneCur = processedChunksAtomic.get() + miscTotal + zipSteps
         emit(ProgressStage.Done, doneCur, progressTotal, input, null)
         val report = OptimizeReport(processedChunksAtomic.get(), removedTotal, errors)
-        config.reportSink?.write(report)
+        request.hooks.reportSink?.write(report)
         metrics.incProcessed(report.processedChunks)
         metrics.incRemoved(report.removedChunks)
         return report
     }
 
     @JvmStatic
-
-
-    suspend fun runSuspend(config: OptimizerConfig): OptimizeReport {
-        return run(config)
+    fun run(input: Path, output: Path? = null, block: OptimizerRequestBuilder.() -> Unit = {}): OptimizeReport {
+        val builder = OptimizerRequestBuilder(input, output)
+        builder.block()
+        return run(builder.build())
     }
 }
