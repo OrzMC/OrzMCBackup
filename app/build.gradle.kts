@@ -45,7 +45,12 @@ tasks.matching { it.name == "shadowJar" }.configureEach {
         archiveBaseName.set("backup")
         archiveClassifier.set("")
         manifest {
-            attributes(mapOf("Main-Class" to "com.jokerhub.orzmc.cli.Main"))
+            attributes(
+                mapOf(
+                    "Main-Class" to "com.jokerhub.orzmc.cli.Main",
+                    "Implementation-Version" to project.version.toString()
+                )
+            )
         }
     }
 }

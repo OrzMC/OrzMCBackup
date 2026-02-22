@@ -8,12 +8,12 @@ import java.util.concurrent.Callable
 
 @Command(
     name = "backup",
-    version = ["0.1.0"],
     description = [
         "Optimize Minecraft Java worlds",
         "Scan MCA region files and remove unused chunks. Keep chunks by InhabitedTime threshold and force-loaded tickets."
     ],
-    mixinStandardHelpOptions = true
+    mixinStandardHelpOptions = true,
+    versionProvider = BuildVersionProvider::class
 )
 class Main : Callable<Int> {
     @Parameters(index = "0", description = ["Minecraft world root"], paramLabel = "WORLD_DIR")
@@ -205,5 +205,12 @@ class Main : Callable<Int> {
             val exit = CommandLine(Main()).execute(*args)
             if (exit != 0) System.exit(exit)
         }
+    }
+}
+
+class BuildVersionProvider : IVersionProvider {
+    override fun getVersion(): Array<String> {
+        val v = Main::class.java.`package`?.implementationVersion ?: "dev"
+        return arrayOf(v)
     }
 }

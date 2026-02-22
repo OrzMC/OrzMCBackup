@@ -1,0 +1,4 @@
+Manifest-Version: 1.0
+Main-Class: com.jokerhub.orzmc.cli.Main
+Implementation-Version: 9.9.9
+
