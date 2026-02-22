@@ -78,6 +78,6 @@ class MainCliReportTest {
         assertTrue(processed != null && processed > 0)
         Cleaner.deleteTreeWithRetry(out, 5, 10)
         Cleaner.deleteTreeWithRetry(input, 5, 10)
-        Cleaner.deleteTreeWithRetry(report.parent, 5, 10)
+        Files.deleteIfExists(report)
     }
 }

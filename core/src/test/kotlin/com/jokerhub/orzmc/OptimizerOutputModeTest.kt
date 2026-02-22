@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
+import kotlin.streams.toList
 
 class OptimizerOutputModeTest {
     private fun createWorldWithEntries(chunks: List<McaMemoryBuilder.MemChunk>): Path {
