@@ -72,7 +72,7 @@ object Optimizer {
         } else {
             if (output == null) {
                 val msg = "非原地模式必须指定输出目录"
-                record(Paths.get("<none>"), "Output", msg)
+                record(input, "Output", msg)
                 return OptimizeReport(processedChunks = 0, removedChunks = 0, errors = errors)
             }
             try {
