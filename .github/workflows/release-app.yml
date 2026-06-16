@@ -42,7 +42,7 @@ jobs:
           test -s "${APP_JAR}" || { echo "missing app jar: ${APP_JAR}"; exit 1; }
           sha256sum "${APP_JAR}" | awk '{print $1}' > "${APP_JAR}.sha256"
       - name: Upload app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: app-backup-${{ env.VERSION }}
           path: |
