@@ -3,7 +3,7 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     application
-    id("com.github.johnrengelman.shadow")
+    id("com.gradleup.shadow")
 }
 
 // Use current JDK; no enforced toolchain to ease local builds
@@ -43,7 +43,7 @@ tasks.test {
 
 
 tasks.matching { it.name == "shadowJar" }.configureEach {
-    (this as com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).apply {
+    (this as com.gradleup.shadow.tasks.ShadowJar).apply {
         archiveBaseName.set("backup")
         archiveClassifier.set("")
         manifest {
