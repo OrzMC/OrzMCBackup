@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "2.1.20" apply false
+    kotlin("jvm") version "2.4.0" apply false
     id("com.gradleup.shadow") version "9.4.2" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.8.3" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.9.8" apply false
 }
 
 // Ensure JDK 17+ for Kotlin compiler compatibility
