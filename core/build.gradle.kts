@@ -1,3 +1,4 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 import java.util.*
 
@@ -15,8 +16,10 @@ plugins {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    api("org.lz4:lz4-java:1.8.0")
+    api("org.lz4:lz4-java:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
+    // lz4-java 1.8.1+ declares conflicting capabilities with at.yawk.lz4 group
+    modules { module("at.yawk.lz4:lz4-java") { replacedBy("org.lz4:lz4-java") } }
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
@@ -46,8 +49,8 @@ java {
 }
 
 tasks.withType<KotlinCompile>().configureEach {
-    kotlinOptions {
-        jvmTarget = "17"
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
