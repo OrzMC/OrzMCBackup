@@ -12,7 +12,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
       - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
@@ -37,7 +37,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
       - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
@@ -63,25 +63,15 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
       - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v5
         with:
-          distribution: ${{ matrix.java == '8' && 'zulu' || 'temurin' }}
+          distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - name: Debug paths on macOS Java 8
-        if: ${{ matrix.java == '8' }}
-        run: |
-          pwd
-          ls -la core/src/test/resources/Fixtures/world || true
-          ls -la src/test/resources/Fixtures/world || true
-          echo "TMPDIR env: ${TMPDIR:-unset}"
-          java -XshowSettings:properties -version 2>&1 | grep -i 'java.io.tmpdir' || true
-          ./gradlew :core:printTestPaths --no-daemon || true
-      - uses: gradle/actions/setup-gradle@v6
       - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on macOS Java ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
