@@ -15,7 +15,7 @@ plugins {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    api("org.lz4:lz4-java:1.8.0")
+    api("org.lz4:lz4-java:1.8.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
