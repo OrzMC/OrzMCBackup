@@ -3,18 +3,19 @@ import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 plugins {
     kotlin("jvm")
     application
-    id("com.github.johnrengelman.shadow")
+    id("com.gradleup.shadow")
 }
 
 // Use current JDK; no enforced toolchain to ease local builds
 
 dependencies {
     implementation(project(":core"))
-    implementation("info.picocli:picocli:4.7.6")
+    implementation("info.picocli:picocli:4.7.7")
     testImplementation(testFixtures(project(":core")))
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
 application {
@@ -22,18 +23,18 @@ application {
 }
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
 }
 
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(8)
+    options.release.set(17)
 }
 
 tasks.test {
@@ -41,17 +42,13 @@ tasks.test {
 }
 
 
-tasks.matching { it.name == "shadowJar" }.configureEach {
-    (this as com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar).apply {
-        archiveBaseName.set("backup")
-        archiveClassifier.set("")
-        manifest {
-            attributes(
-                mapOf(
-                    "Main-Class" to "com.jokerhub.orzmc.cli.Main",
-                    "Implementation-Version" to project.version.toString()
-                )
-            )
-        }
+tasks.withType<Jar>().named("shadowJar") {
+    archiveBaseName.set("backup")
+    archiveClassifier.set("")
+    manifest {
+        attributes(mapOf(
+            "Main-Class" to "com.jokerhub.orzmc.cli.Main",
+            "Implementation-Version" to project.version.toString()
+        ))
     }
 }

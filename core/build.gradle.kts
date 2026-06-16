@@ -6,7 +6,7 @@ plugins {
     `maven-publish`
     signing
     `java-test-fixtures`
-    id("org.jetbrains.dokka") version "1.9.20"
+    id("org.jetbrains.dokka") version "2.2.0"
     id("org.jetbrains.kotlinx.kover")
 }
 
@@ -15,12 +15,12 @@ plugins {
 
 dependencies {
     implementation(kotlin("stdlib"))
-    implementation("org.lz4:lz4-java:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    api("org.lz4:lz4-java:1.8.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
     testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:1.10.1")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
 }
 
 tasks.test {
@@ -40,19 +40,19 @@ tasks.test {
 // Test resources are expected under src/test/resources/Fixtures committed to VCS
 
 java {
-    sourceCompatibility = JavaVersion.VERSION_1_8
-    targetCompatibility = JavaVersion.VERSION_1_8
+    sourceCompatibility = JavaVersion.VERSION_17
+    targetCompatibility = JavaVersion.VERSION_17
     withSourcesJar()
 }
 
 tasks.withType<KotlinCompile>().configureEach {
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
 }
 
 tasks.withType<JavaCompile>().configureEach {
-    options.release.set(8)
+    options.release.set(17)
 }
 
 tasks.register<JavaExec>("printTestPaths") {

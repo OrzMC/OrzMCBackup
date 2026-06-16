@@ -12,21 +12,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-ubuntu-${{ matrix.java }}
           path: |
@@ -37,22 +37,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on Windows Java ${{ matrix.java }}
         shell: pwsh
         run: .\gradlew.bat :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-windows-${{ matrix.java }}
           path: |
@@ -63,31 +63,21 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        java: [ '8', '11', '17', '21' ]
+        java: [ '17', '21', '25' ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Java ${{ matrix.java }}
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
-          distribution: ${{ matrix.java == '8' && 'zulu' || 'temurin' }}
+          distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - name: Debug paths on macOS Java 8
-        if: ${{ matrix.java == '8' }}
-        run: |
-          pwd
-          ls -la core/src/test/resources/Fixtures/world || true
-          ls -la src/test/resources/Fixtures/world || true
-          echo "TMPDIR env: ${TMPDIR:-unset}"
-          java -XshowSettings:properties -version 2>&1 | grep -i 'java.io.tmpdir' || true
-          ./gradlew :core:printTestPaths --no-daemon || true
-      - uses: gradle/actions/setup-gradle@v3
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on macOS Java ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-macos-${{ matrix.java }}
           path: |
@@ -96,18 +86,18 @@ jobs:
   coverage:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Setup Java 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests with coverage
         run: ./gradlew :core:koverXmlReport --no-daemon
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: core/build/reports/kover/
