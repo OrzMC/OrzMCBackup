@@ -59,7 +59,7 @@ class LoggerSinkTest {
         } finally {
             System.setOut(original)
         }
-        return baos.toString(Charsets.UTF_8)
+        return String(baos.toByteArray(), Charsets.UTF_8)
     }
 
     private fun captureStderr(block: () -> Unit): String {
@@ -71,6 +71,6 @@ class LoggerSinkTest {
         } finally {
             System.setErr(original)
         }
-        return baos.toString(Charsets.UTF_8)
+        return String(baos.toByteArray(), Charsets.UTF_8)
     }
 }
