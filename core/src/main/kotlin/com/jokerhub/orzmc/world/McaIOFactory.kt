@@ -5,18 +5,26 @@ import com.jokerhub.orzmc.mca.McaReader
 import com.jokerhub.orzmc.mca.McaWriter
 import java.nio.file.Path
 
-interface McaReaderLike {
+/** Read-only view of an MCA region file, implementing [AutoCloseable] for use with `use {}` blocks. */
+interface McaReaderLike : AutoCloseable {
+    /** All chunk entries in the region file. */
     fun entries(): List<McaEntry>
+    /** Get one chunk by sector index (0-1023), or null if unused. */
     fun get(index: Int): McaEntry?
-    fun close()
+    override fun close()
 }
 
+/** Write handle for an MCA region file. */
 interface McaWriterLike {
+    /** Write one chunk entry (4 KiB sector-aligned). */
     fun writeEntry(entry: McaEntry)
+    /** Flush the location/timestamp header tables to disk. */
     fun finalizeFile()
+    /** Close the underlying file handle. */
     fun close()
 }
 
+/** Factory for creating [McaReaderLike] and [McaWriterLike] instances for a given [FileSystem]. */
 interface McaIOFactory {
     fun openReader(fs: FileSystem, path: Path): McaReaderLike
     fun createWriter(fs: FileSystem, path: Path): McaWriterLike

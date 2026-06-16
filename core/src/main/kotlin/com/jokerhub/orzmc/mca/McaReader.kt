@@ -6,6 +6,16 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.regex.Pattern
 
+/**
+ * Reads Minecraft Anvil region files (.mca).
+ *
+ * Each region file contains a 8 KiB header (4 KiB location table + 4 KiB timestamp table)
+ * followed by sector-aligned chunk data. This class parses the header and provides
+ * access to individual chunk entries via [entries] or [get].
+ *
+ * @param xPos region X coordinate (derived from filename)
+ * @param zPos region Z coordinate (derived from filename)
+ */
 class McaReader(private val file: RandomAccess, private val path: String, val xPos: Int, val zPos: Int) : AutoCloseable {
     private var offsets: IntArray? = null
     private var sizes: IntArray? = null
@@ -13,15 +23,19 @@ class McaReader(private val file: RandomAccess, private val path: String, val xP
 
     companion object {
         private val FILENAME_RE = Pattern.compile("r\\.(-?\\d+)\\.(-?\\d+)\\.mca$")
+
+        /** Open a region file from disk. The filename must match `r.x.z.mca`. */
         fun open(path: String): McaReader {
             val m = FILENAME_RE.matcher(path)
             require(m.find()) { "invalid mca filename: $path" }
             val x = m.group(1).toInt()
             val z = m.group(2).toInt()
             val raf = RandomAccessFile(File(path), "r")
-            return McaReader(RafAccess(raf), path, x, z)
+            val fileLen = raf.length()
+            return McaReader(BufferedRafAccess(RafAccess(raf), fileLen), path, x, z)
         }
 
+        /** Open a region file from in-memory bytes. Useful for testing. */
         fun openFromBytes(path: String, bytes: ByteArray): McaReader {
             val m = FILENAME_RE.matcher(path)
             require(m.find()) { "invalid mca filename: $path" }
@@ -61,6 +75,7 @@ class McaReader(private val file: RandomAccess, private val path: String, val xP
         if (offsets == null) readHeader()
     }
 
+    /** Return all chunk entries in this region file (skipping unused sector slots). */
     fun entries(): List<McaEntry> {
         ensure()
         val offs = offsets!!
@@ -87,6 +102,7 @@ class McaReader(private val file: RandomAccess, private val path: String, val xP
         return out
     }
 
+    /** Get a single chunk entry by sector index (0-1023), or null if unused. */
     fun get(index: Int): McaEntry? {
         ensure()
         val off = offsets!![index]

@@ -8,21 +8,61 @@ import java.nio.file.Paths
 
 enum class ProgressMode { Off, Global, Region }
 
-object Optimizer {
+/**
+ * Shared context for dimension processing methods.
+ * Collapses the 15+ parameter explosion in helper methods.
+ */
+internal data class DimensionContext(
+    val fs: FileSystem,
+    val input: Path,
+    val out: Path,
+    val ticks: Long,
+    val progressTotal: Long,
+    val processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
+    val record: (Path, String, String) -> Unit,
+    val emit: (ProgressStage, Long?, Long?, Path?, String?) -> Unit,
+    val metricsSink: MetricsSink,
+    val removeUnknown: Boolean,
+    val strict: Boolean,
+    val progressInterval: Long,
+    val progressIntervalMs: Long,
+    val progressSink: ProgressSink,
+    val ioFactory: McaIOFactory,
+    val parallelism: Int,
+    val dryRun: Boolean = false
+)
 
+/**
+ * Backward-compatible entry point for Java and simpler Kotlin callers.
+ * Delegates to [DefaultOptimizer] under the hood, providing [@JvmStatic] accessors
+ * so existing `Optimizer.run(request)` calls continue to compile.
+ *
+ * For injection/mock support, use the [Optimizer] interface and [DefaultOptimizer].
+ */
+object Optimizer {
+    @JvmStatic
+    fun run(request: OptimizerRequest): OptimizeReport = DefaultOptimizer.run(request)
+
+    @JvmStatic
+    fun run(input: Path, output: Path? = null, block: OptimizerRequestBuilder.() -> Unit = {}): OptimizeReport =
+        DefaultOptimizer.run(input, output, block)
+}
+
+/**
+ * Default [Optimizer] implementation.
+ */
+object DefaultOptimizer : OptimizerEngine {
     private fun isDimensionDir(fs: FileSystem, path: Path): Boolean = fs.isDirectory(path.resolve("region"))
 
     private fun discoverDimensions(fs: FileSystem, root: Path): List<Path> {
         val tasks = mutableListOf<Path>()
         if (isDimensionDir(fs, root)) tasks.add(root)
-        fs.list(root).filter { fs.isDirectory(it) && isDimensionDir(fs, it) }.forEach { tasks.add(it) }
-        fs.walk(root).filter { fs.isDirectory(it) && isDimensionDir(fs, it) }
-            .forEach { p -> if (!tasks.contains(p)) tasks.add(p) }
+        fs.walk(root).filter { it != root && fs.isDirectory(it) && isDimensionDir(fs, it) }
+            .forEach { tasks.add(it) }
         return tasks
     }
 
-    @JvmStatic
-    fun run(request: OptimizerRequest): OptimizeReport {
+    override fun run(request: OptimizerRequest): OptimizeReport {
         val input = request.input
         val fs = request.io.fs
         val errors = mutableListOf<OptimizeError>()
@@ -47,38 +87,57 @@ object Optimizer {
         }
 
         if (!fs.isDirectory(input)) {
-            val msg = "输入目录不存在或不是目录"
+            val msg = "Input directory does not exist or is not a directory"
             record(input, "Input", msg)
             return OptimizeReport(processedChunks = 0, removedChunks = 0, errors = errors)
         }
-        emit(ProgressStage.Init, 0, 0, input, "开始")
+        emit(ProgressStage.Init, 0, 0, input, "starting")
 
         val out = resolveOutputDir(fs, request, errors, progressSink) ?: return OptimizeReport(0, 0, errors)
         val ticks = request.filter.inhabitedThresholdSeconds * 20
-        emit(ProgressStage.Discover, null, null, input, "扫描维度")
+        emit(ProgressStage.Discover, null, null, input, "scanning dimensions")
         val tasks = discoverDimensions(fs, input)
-        val totalChunks = McaUtils.countTotalChunks(fs, tasks)
+        val totalChunks = McaUtils.countTotalChunks(fs, request.io.ioFactory, tasks) { p, k, m -> record(p, k, m) }
 
         val miscTotal = countMiscFiles(fs, tasks, request)
         val zipSteps = if (!request.outputOptions.inPlace && request.outputOptions.zipOutput) 2L else 0L
         val progressTotal = totalChunks + miscTotal + zipSteps
-        emit(ProgressStage.Discover, 0, totalChunks, input, "统计区块")
+        emit(ProgressStage.Discover, 0, totalChunks, input, "counting chunks")
 
-        // Wrap local functions in lambdas to avoid ambiguity in argument position
         val processedChunksAtomic = java.util.concurrent.atomic.AtomicLong(0L)
-        val removedTotal = processDimensions(fs, request, input, out, ticks, tasks, progressTotal,
-            processedChunksAtomic, { p, k, m -> record(p, k, m) }, { s, c, t, p, m -> emit(s, c, t, p, m) })
 
-        if (request.outputOptions.inPlace) {
-            handleInPlaceReplacement(fs, tasks, input, out)
-        } else {
-            if (request.outputOptions.copyMisc) {
-                copyMiscFiles(fs, tasks, input, out, request, progressTotal,
-                    processedChunksAtomic, miscTotal, { s, c, t, p, m -> emit(s, c, t, p, m) })
-            }
-            if (request.outputOptions.zipOutput) {
-                handleZipOutput(fs, out, progressTotal, processedChunksAtomic, miscTotal,
-                    { p, k, m -> record(p, k, m) }, { s, c, t, p, m -> emit(s, c, t, p, m) })
+        val ctx = DimensionContext(
+            fs = fs,
+            input = input,
+            out = out,
+            ticks = ticks,
+            progressTotal = progressTotal,
+            processedChunksAtomic = processedChunksAtomic,
+            record = { p, k, m -> record(p, k, m) },
+            emit = { s, c, t, p, m -> emit(s, c, t, p, m) },
+            metricsSink = metrics,
+            removeUnknown = request.filter.removeUnknown,
+            strict = request.filter.strict,
+            progressInterval = request.progress.interval,
+            progressIntervalMs = request.progress.intervalMs,
+            progressSink = progressSink,
+            ioFactory = request.io.ioFactory,
+            parallelism = request.runtime.parallelism,
+            dryRun = request.outputOptions.dryRun
+        )
+
+        val removedTotal = processDimensions(ctx, tasks)
+
+        if (!request.outputOptions.dryRun) {
+            if (request.outputOptions.inPlace) {
+                handleInPlaceReplacement(fs, tasks, input, out)
+            } else {
+                if (request.outputOptions.copyMisc) {
+                    copyMiscFiles(ctx, tasks, miscTotal, request)
+                }
+                if (request.outputOptions.zipOutput) {
+                    handleZipOutput(ctx, miscTotal)
+                }
             }
         }
 
@@ -101,9 +160,10 @@ object Optimizer {
     ): Path? {
         val input = request.input
         val output = request.output
+        if (request.outputOptions.dryRun) return fs.createTempDirectory("thanos-dry-")
         if (request.outputOptions.inPlace) return fs.createTempDirectory("thanos-")
         if (output == null) {
-            val msg = "非原地模式必须指定输出目录"
+            val msg = "Output directory required when not in in-place mode"
             errors.add(OptimizeError(input.toString(), "Output", msg))
             return null
         }
@@ -116,7 +176,7 @@ object Optimizer {
                             .forEach { fs.deleteIfExists(it) }
                         fs.createDirectories(output)
                     } else {
-                        val msg = "输出目录已存在且非空，使用 --force 覆盖"
+                        val msg = "Output directory already exists and is not empty; use --force to overwrite"
                         errors.add(OptimizeError(output.toString(), "Output", msg))
                         return null
                     }
@@ -125,7 +185,7 @@ object Optimizer {
                 fs.createDirectories(output)
             }
         } catch (e: IOException) {
-            val msg = "输出目录不可写或访问受限：${output}"
+            val msg = "Output directory is not writable or access denied: ${output}"
             errors.add(OptimizeError(output.toString(), "Output", msg))
             return null
         }
@@ -149,115 +209,67 @@ object Optimizer {
         return c
     }
 
-    private fun processDimensions(
-        fs: FileSystem,
-        request: OptimizerRequest,
-        input: Path,
-        out: Path,
-        ticks: Long,
-        tasks: List<Path>,
-        progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
-        record: (Path, String, String) -> Unit,
-        emit: (ProgressStage, Long?, Long?, Path?, String?) -> Unit
-    ): Long {
-        val removeUnknown = request.filter.removeUnknown
-        val strict = request.filter.strict
-        val progressInterval = request.progress.interval
-        val progressIntervalMs = request.progress.intervalMs
-        val progressSink = request.progress.sink
-        val ioFactory = request.io.ioFactory
-        val parallelism = request.runtime.parallelism
-        val metrics = request.hooks.metricsSink ?: NoopMetricsSink()
-
-        if (parallelism <= 1) {
-            return processSerially(fs, input, out, ticks, tasks, progressTotal, processedChunksAtomic,
-                removeUnknown, strict, progressInterval, progressIntervalMs, progressSink, ioFactory,
-                record, metrics)
+    private fun processDimensions(ctx: DimensionContext, tasks: List<Path>): Long {
+        if (ctx.parallelism <= 1) {
+            return processSerially(ctx, tasks)
         } else {
-            return processInParallel(fs, input, out, ticks, tasks, progressTotal, processedChunksAtomic,
-                removeUnknown, strict, progressInterval, progressIntervalMs, progressSink, ioFactory,
-                parallelism, record, metrics)
+            return processInParallel(ctx, tasks)
         }
     }
 
-    private fun processSerially(
-        fs: FileSystem, input: Path, out: Path, ticks: Long, tasks: List<Path>, progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
-        removeUnknown: Boolean, strict: Boolean, progressInterval: Long, progressIntervalMs: Long,
-        progressSink: ProgressSink, ioFactory: McaIOFactory,
-        record: (Path, String, String) -> Unit,
-        metrics: MetricsSink
-    ): Long {
+    private fun processSerially(ctx: DimensionContext, tasks: List<Path>): Long {
         var removedTotal = 0L
         tasks.forEach { dim ->
-            val result = processSingleDimension(fs, input, out, ticks, dim, progressTotal, processedChunksAtomic,
-                removeUnknown, strict, progressInterval, progressIntervalMs, progressSink, ioFactory, record)
+            val result = processSingleDimension(ctx, dim)
             removedTotal += result.removed
-            metrics.incProcessed(result.processed)
-            metrics.incRemoved(result.removed)
+            ctx.metricsSink.incProcessed(result.processed)
+            ctx.metricsSink.incRemoved(result.removed)
         }
         return removedTotal
     }
 
-    private fun processInParallel(
-        fs: FileSystem, input: Path, out: Path, ticks: Long, tasks: List<Path>, progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
-        removeUnknown: Boolean, strict: Boolean, progressInterval: Long, progressIntervalMs: Long,
-        progressSink: ProgressSink, ioFactory: McaIOFactory,
-        parallelism: Int, record: (Path, String, String) -> Unit,
-        metrics: MetricsSink
-    ): Long {
+    private fun processInParallel(ctx: DimensionContext, tasks: List<Path>): Long {
         var removedTotal = 0L
-        val executor = java.util.concurrent.Executors.newFixedThreadPool(parallelism)
+        val executor = java.util.concurrent.Executors.newFixedThreadPool(ctx.parallelism)
         val futures = mutableListOf<java.util.concurrent.Future<DimensionResult>>()
         tasks.forEach { dim ->
-            val task = java.util.concurrent.Callable {
-                processSingleDimension(fs, input, out, ticks, dim, progressTotal, processedChunksAtomic,
-                    removeUnknown, strict, progressInterval, progressIntervalMs, progressSink, ioFactory, record)
-            }
+            val task = java.util.concurrent.Callable { processSingleDimension(ctx, dim) }
             futures.add(executor.submit(task))
         }
         futures.forEach { f ->
             try {
                 val r = f.get()
                 removedTotal += r.removed
-                metrics.incProcessed(r.processed)
-                metrics.incRemoved(r.removed)
+                ctx.metricsSink.incProcessed(r.processed)
+                ctx.metricsSink.incRemoved(r.removed)
             } catch (e: Exception) {
-                record(input, "Parallel", "维度并行处理失败：${e.message ?: "未知错误"}")
+                ctx.record(ctx.input, "Parallel", "Dimension parallel processing failed: ${e.message ?: "unknown error"}")
             }
         }
         executor.shutdown()
         return removedTotal
     }
 
-    private fun processSingleDimension(
-        fs: FileSystem, input: Path, out: Path, ticks: Long, dim: Path, progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
-        removeUnknown: Boolean, strict: Boolean, progressInterval: Long, progressIntervalMs: Long,
-        progressSink: ProgressSink, ioFactory: McaIOFactory,
-        record: (Path, String, String) -> Unit
-    ): DimensionResult {
-        val rel = input.relativize(dim)
-        val targetDim = out.resolve(rel)
+    private fun processSingleDimension(ctx: DimensionContext, dim: Path): DimensionResult {
+        val rel = ctx.input.relativize(dim)
+        val targetDim = ctx.out.resolve(rel)
         val forced = try {
-            ForceLoad.parse(dim, strict)
+            ForceLoad.parse(dim, ctx.strict)
         } catch (e: ForceLoadedParseException) {
-            if (strict) record(dim, "ForceLoaded", e.message ?: "解析强制加载列表失败")
+            if (ctx.strict) ctx.record(dim, "ForceLoaded", e.message ?: "Failed to parse force-loaded chunk list")
             emptyList()
         }
         val patterns = listOf(
             ListPattern(forced),
-            InhabitedTimePattern(ticks, removeUnknown)
+            InhabitedTimePattern(ctx.ticks, ctx.removeUnknown)
         )
-        val res = DimensionProcessor.process(
-            fs, ioFactory, dim, targetDim, patterns,
-            { p, k, m -> record(p, k, m) },
-            progressSink, progressTotal, progressInterval, progressIntervalMs,
-            processedChunksAtomic, strict
+        return DimensionProcessor.process(
+            ctx.fs, ctx.ioFactory, dim, targetDim, patterns,
+            ctx.record, ctx.progressSink, ctx.progressTotal,
+            ctx.progressInterval, ctx.progressIntervalMs,
+            ctx.processedChunksAtomic, ctx.strict, ctx.parallelism,
+            dryRun = ctx.dryRun
         )
-        return res
     }
 
     private fun handleInPlaceReplacement(
@@ -274,7 +286,7 @@ object Optimizer {
                 try {
                     fs.createDirectories(dst)
                 } catch (e: IOException) {
-                    throw InPlaceReplacementException("无法创建目标目录：${dst}", e)
+                    throw InPlaceReplacementException("Failed to create target directory: ${dst}", e)
                 }
                 val keep = HashSet<String>()
                 fs.list(src).filter { it.toString().endsWith(".mca") }.forEach { keep.add(it.fileName.toString()) }
@@ -284,7 +296,7 @@ object Optimizer {
                             if (!keep.contains(p.fileName.toString())) fs.deleteIfExists(p)
                         }
                     } catch (e: IOException) {
-                        throw InPlaceReplacementException("清理目标目录失败：${dst}", e)
+                        throw InPlaceReplacementException("Failed to clean target directory: ${dst}", e)
                     }
                 }
                 try {
@@ -293,7 +305,7 @@ object Optimizer {
                         fs.copy(p, target, true)
                     }
                 } catch (e: IOException) {
-                    throw InPlaceReplacementException("复制文件到目标目录失败：${dst}", e)
+                    throw InPlaceReplacementException("Failed to copy files to target directory: ${dst}", e)
                 }
             }
         }
@@ -301,21 +313,20 @@ object Optimizer {
             val ok = fs.deleteTreeWithRetry(out, 5, 500)
             if (!ok) throw IOException("cleanup failed")
         } catch (e: IOException) {
-            throw InPlaceReplacementException("清理临时目录失败：${out}", e)
+            throw InPlaceReplacementException("Failed to clean up temp directory: ${out}", e)
         }
     }
 
     private fun copyMiscFiles(
-        fs: FileSystem, tasks: List<Path>, input: Path, out: Path,
-        request: OptimizerRequest, progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
+        ctx: DimensionContext,
+        tasks: List<Path>,
         miscTotal: Long,
-        emit: (ProgressStage, Long?, Long?, Path?, String?) -> Unit
+        request: OptimizerRequest
     ) {
-        val base = processedChunksAtomic.get()
-        emit(ProgressStage.CopyMisc, base, progressTotal, out, "复制杂项文件")
-        val progressIntervalMs = request.progress.intervalMs
-        val progressInterval = request.progress.interval
+        val base = ctx.processedChunksAtomic.get()
+        ctx.emit(ProgressStage.CopyMisc, base, ctx.progressTotal, ctx.out, "copying misc files")
+        val progressIntervalMs = ctx.progressIntervalMs
+        val progressInterval = ctx.progressInterval
         var done = 0L
         val useTime = progressIntervalMs > 0
         var lastEmit = System.currentTimeMillis()
@@ -323,74 +334,75 @@ object Optimizer {
             if (useTime) {
                 val now = System.currentTimeMillis()
                 if (now - lastEmit >= progressIntervalMs) {
-                    emit(ProgressStage.CopyMiscProgress, base + done, progressTotal, p, null)
+                    ctx.emit(ProgressStage.CopyMiscProgress, base + done, ctx.progressTotal, p, null)
                     lastEmit = now
                 }
             } else if (progressInterval > 0 && done % progressInterval == 0L) {
-                emit(ProgressStage.CopyMiscProgress, base + done, progressTotal, p, null)
+                ctx.emit(ProgressStage.CopyMiscProgress, base + done, ctx.progressTotal, p, null)
             }
         }
         tasks.forEach { dim ->
-            val rel = input.relativize(dim)
-            val outDim = out.resolve(rel)
-            fs.createDirectories(outDim)
+            val rel = ctx.input.relativize(dim)
+            val outDim = ctx.out.resolve(rel)
+            ctx.fs.createDirectories(outDim)
             val reserved = setOf("region", "entities", "poi")
-            for (p in fs.walk(dim)) {
+            for (p in ctx.fs.walk(dim)) {
                 if (p == dim) continue
                 val relPath = dim.relativize(p)
                 if (relPath.toString().isEmpty()) continue
                 val top = if (relPath.nameCount > 0) relPath.getName(0).toString() else ""
                 if (reserved.contains(top)) continue
                 val target = outDim.resolve(relPath)
-                if (fs.isDirectory(p)) {
-                    fs.createDirectories(target)
+                if (ctx.fs.isDirectory(p)) {
+                    ctx.fs.createDirectories(target)
                     done += 1
                     maybeEmit(target)
                 } else {
                     try {
-                        fs.createDirectories(target.parent ?: outDim)
-                    } catch (_: Exception) {}
+                        ctx.fs.createDirectories(target.parent ?: outDim)
+                    } catch (e: Exception) {
+                        ctx.record(p, "CopyMisc", "创建目录失败: ${e.message}")
+                    }
                     try {
-                        fs.copy(p, target, true)
-                    } catch (_: Exception) {}
+                        ctx.fs.copy(p, target, true)
+                    } catch (e: Exception) {
+                        ctx.record(p, "CopyMisc", "复制文件失败: ${e.message}")
+                    }
                     done += 1
                     maybeEmit(target)
                 }
             }
         }
-        emit(ProgressStage.CopyMiscProgress, base + done, progressTotal, out, null)
+        ctx.emit(ProgressStage.CopyMiscProgress, base + done, ctx.progressTotal, ctx.out, null)
     }
 
-    private fun handleZipOutput(
-        fs: FileSystem, out: Path, progressTotal: Long,
-        processedChunksAtomic: java.util.concurrent.atomic.AtomicLong,
-        miscTotal: Long,
-        record: (Path, String, String) -> Unit,
-        emit: (ProgressStage, Long?, Long?, Path?, String?) -> Unit
-    ) {
-        val base = processedChunksAtomic.get()
+    private fun handleZipOutput(ctx: DimensionContext, miscTotal: Long) {
+        val base = ctx.processedChunksAtomic.get()
         val afterMisc = base + miscTotal
         try {
-            emit(ProgressStage.Compress, afterMisc, progressTotal, out, null)
-            Compressor.compressToTimestampZip(out)
-            emit(ProgressStage.Compress, afterMisc + 1, progressTotal, out, null)
+            ctx.emit(ProgressStage.Compress, afterMisc, ctx.progressTotal, ctx.out, null)
+            Compressor.compressToTimestampZip(ctx.out)
+            ctx.emit(ProgressStage.Compress, afterMisc + 1, ctx.progressTotal, ctx.out, null)
         } catch (e: IOException) {
-            val msg = "压缩输出目录失败：${out}"
-            record(out, "Compress", msg)
+            val msg = "Failed to compress output directory: ${ctx.out}"
+            ctx.record(ctx.out, "Compress", msg)
         }
         try {
-            emit(ProgressStage.Cleanup, afterMisc + 1, progressTotal, out, null)
-            val ok = fs.deleteTreeWithRetry(out, 5, 500)
+            ctx.emit(ProgressStage.Cleanup, afterMisc + 1, ctx.progressTotal, ctx.out, null)
+            val ok = ctx.fs.deleteTreeWithRetry(ctx.out, 5, 500)
             if (!ok) throw IOException("cleanup failed")
-            emit(ProgressStage.Cleanup, afterMisc + 2, progressTotal, out, null)
+            ctx.emit(ProgressStage.Cleanup, afterMisc + 2, ctx.progressTotal, ctx.out, null)
         } catch (e: IOException) {
-            val msg = "删除输出目录失败：${out}"
-            record(out, "Cleanup", msg)
+            val msg = "Failed to delete output directory: ${ctx.out}"
+            ctx.record(ctx.out, "Cleanup", msg)
         }
     }
 
-    @JvmStatic
-    fun run(input: Path, output: Path? = null, block: OptimizerRequestBuilder.() -> Unit = {}): OptimizeReport {
+    override fun run(
+        input: Path,
+        output: Path?,
+        block: OptimizerRequestBuilder.() -> Unit
+    ): OptimizeReport {
         val builder = OptimizerRequestBuilder(input, output)
         builder.block()
         return run(builder.build())

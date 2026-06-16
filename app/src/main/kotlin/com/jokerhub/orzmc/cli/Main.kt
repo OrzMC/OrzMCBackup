@@ -105,6 +105,8 @@ class Main : Callable<Int> {
     var parallelism: Int = 1
     @Option(names = ["--copy-misc"], description = ["Copy non-region/entities/poi files and folders in each dimension"], defaultValue = "true", negatable = true)
     var copyMisc: Boolean = true
+    @Option(names = ["--dry-run"], description = ["Preview mode: scan and report without writing any output"], defaultValue = "false")
+    var dryRun: Boolean = false
 
     override fun call(): Int {
         return try {
@@ -178,7 +180,8 @@ class Main : Callable<Int> {
                     inPlace = inPlace,
                     zipOutput = zipOutput,
                     force = force,
-                    copyMisc = copyMisc
+                    copyMisc = copyMisc,
+                    dryRun = dryRun
                 ),
                 progress = ProgressOptions(
                     interval = progressInterval,

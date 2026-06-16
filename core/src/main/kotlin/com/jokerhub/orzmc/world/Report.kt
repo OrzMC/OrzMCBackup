@@ -3,20 +3,52 @@ package com.jokerhub.orzmc.world
 import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
+/**
+ * An error recorded during optimization.
+ * @property path the file or directory that caused the error
+ * @property kind error category (e.g. "MCA", "Entities", "Output")
+ * @property message human-readable error description
+ */
 data class OptimizeError(
     val path: String,
     val kind: String,
     val message: String
 )
 
+/**
+ * Summary report for an optimization run.
+ * @property processedChunks total chunks that were kept after filtering
+ * @property removedChunks total chunks that were removed
+ * @property errors list of non-fatal errors encountered
+ */
 data class OptimizeReport(
     val processedChunks: Long,
     val removedChunks: Long,
     val errors: List<OptimizeError>
 )
 
+/** Serializes [OptimizeReport] to JSON, CSV, or plain text formats. */
 object ReportIO {
-    private fun esc(s: String): String = s.replace("\\", "\\\\").replace("\"", "\\\"")
+    private fun esc(s: String): String {
+        val out = StringBuilder(s.length + 16)
+        for (c in s) {
+            when (c) {
+                '\\' -> out.append("\\\\")
+                '"' -> out.append("\\\"")
+                '\n' -> out.append("\\n")
+                '\r' -> out.append("\\r")
+                '\t' -> out.append("\\t")
+                '\b' -> out.append("\\b")
+                '' -> out.append("\\f")
+                else -> if (c.code in 0..0x1F) {
+                    out.append("\\u").append(String.format("%04x", c.code))
+                } else {
+                    out.append(c)
+                }
+            }
+        }
+        return out.toString()
+    }
 
     fun toJson(r: OptimizeReport): String {
         val sb = StringBuilder()
@@ -51,11 +83,11 @@ object ReportIO {
 
     fun toText(r: OptimizeReport): String {
         val sb = StringBuilder()
-        sb.append("处理统计：processed=").append(r.processedChunks)
+        sb.append("Statistics: processed=").append(r.processedChunks)
             .append(" removed=").append(r.removedChunks)
             .append(" errors=").append(r.errors.size).append("\n")
         if (r.errors.isNotEmpty()) {
-            sb.append("错误列表：\n")
+            sb.append("Error list:\n")
             r.errors.forEach { e ->
                 sb.append("[").append(e.kind).append("] ").append(e.path).append(" - ").append(e.message).append("\n")
             }

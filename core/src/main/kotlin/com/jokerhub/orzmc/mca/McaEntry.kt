@@ -6,6 +6,16 @@ import java.nio.ByteOrder
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
 
+/**
+ * Represents a single chunk entry within an MCA (Anvil) region file.
+ *
+ * Each entry references a position in the underlying region file and provides
+ * access to the chunk's raw serialized bytes, decompressed data, and metadata
+ * such as position, compression method, and modification time.
+ *
+ * Entry instances are created by [McaReader] and are read-only views into
+ * the underlying file; they do not own the file handle.
+ */
 class McaEntry(
     private val file: RandomAccess,
     private val start: Long,
@@ -15,13 +25,20 @@ class McaEntry(
     private val regionX: Int,
     private val regionZ: Int,
 ) {
+    /** Compression methods used in Minecraft region files. */
     enum class CompressionMethod { GZIP, ZLIB, RAW, LZ4, CUSTOM, EXT_GZIP, EXT_ZLIB, EXT_RAW, EXT_LZ4 }
 
+    /** Index within the sector table (0-1023). Maps to (x = index % 32, z = index / 32) within the region. */
     fun regionIndex(): Int = index
+    /** Local X coordinate within the region (0-31). */
     fun xPos(): Int = index % 32
+    /** Local Z coordinate within the region (0-31). */
     fun zPos(): Int = index / 32
+    /** Global X coordinate across the world. */
     fun globalX(): Int = regionX * 32 + xPos()
+    /** Global Z coordinate across the world. */
     fun globalZ(): Int = regionZ * 32 + zPos()
+    /** Timestamp of last modification (Unix epoch seconds). */
     fun modifiedTime(): Int = modified
 
     private fun readHeader(): Triple<Int, CompressionMethod, String?> {

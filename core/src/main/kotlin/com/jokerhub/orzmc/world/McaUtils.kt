@@ -1,29 +1,35 @@
 package com.jokerhub.orzmc.world
 
 import com.jokerhub.orzmc.mca.McaReader
-import java.nio.file.Files
 import java.nio.file.Path
 
+/** Utilities for inspecting MCA region files. */
 object McaUtils {
     fun isValidMca(fs: FileSystem, path: Path): Boolean {
         return try {
-            Files.size(fs.toRealPath(path)) >= 8192
+            fs.size(path) >= 8192
         } catch (_: Exception) {
             false
         }
     }
 
-    fun countTotalChunks(fs: FileSystem, dims: List<Path>): Long {
+    fun countTotalChunks(
+        fs: FileSystem,
+        ioFactory: McaIOFactory,
+        dims: List<Path>,
+        onError: ((Path, String, String) -> Unit)? = null
+    ): Long {
         var total = 0L
         for (dim in dims) {
             val regionDir = dim.resolve("region")
             if (!fs.isDirectory(regionDir)) continue
             fs.list(regionDir).filter { it.toString().endsWith(".mca") && isValidMca(fs, it) }.forEach { p ->
                 try {
-                    McaReader.open(fs.toRealPath(p).toString()).use { r ->
+                    ioFactory.openReader(fs, p).use { r ->
                         total += r.entries().size
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    onError?.invoke(p, "MCA", "Failed to count chunks: ${e.message}")
                 }
             }
         }

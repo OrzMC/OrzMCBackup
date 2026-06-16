@@ -4,6 +4,16 @@ import com.jokerhub.orzmc.mca.McaEntry
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/**
+ * Pattern that keeps chunks whose `InhabitedTime` NBT value meets the threshold.
+ *
+ * Uses a fast byte-level scan of the decompressed chunk data to locate the
+ * `InhabitedTime` long field without a full NBT parse. External-compressed
+ * and unparseable chunks are handled according to [removeUnknown].
+ *
+ * @param threshold minimum InhabitedTime in game ticks (20 ticks = 1 second)
+ * @param removeUnknown if true, external/unparseable chunks are removed; otherwise they are kept
+ */
 class InhabitedTimePattern(
     private val threshold: Long,
     private val removeUnknown: Boolean,

@@ -8,6 +8,11 @@ data class DimensionResult(
     val removed: Long
 )
 
+private data class RegionResult(
+    val processed: Long,
+    val removed: Long
+)
+
 internal object DimensionProcessor {
     private const val ERR_MCA = "MCA"
     private const val ERR_ENTITIES = "Entities"
@@ -20,6 +25,7 @@ internal object DimensionProcessor {
     private const val ERR_FINALIZE = "Finalize"
     private const val ERR_FINALIZE_ENTITIES = "FinalizeEntities"
     private const val ERR_FINALIZE_POI = "FinalizePoi"
+
     fun process(
         fs: FileSystem,
         ioFactory: McaIOFactory,
@@ -32,7 +38,9 @@ internal object DimensionProcessor {
         progressInterval: Long,
         progressIntervalMs: Long,
         processedCounter: java.util.concurrent.atomic.AtomicLong,
-        strict: Boolean
+        strict: Boolean,
+        regionParallelism: Int = 1,
+        dryRun: Boolean = false
     ): DimensionResult {
         var removedTotal = 0L
         fs.createDirectories(targetDim)
@@ -45,97 +53,164 @@ internal object DimensionProcessor {
         progressSink.emit(ProgressEvent(ProgressStage.DimensionStart, null, null, inputDim.toString(), null))
         val useTime = progressIntervalMs > 0
         var lastEmit = System.currentTimeMillis()
-        fs.list(regionDir).filter { p -> p.toString().endsWith(".mca") }.forEach regionLoop@{ rf ->
-            progressSink.emit(ProgressEvent(ProgressStage.RegionStart, null, null, rf.toString(), null))
-            if (!McaUtils.isValidMca(fs, rf)) {
-                onError(rf, ERR_MCA, "MCA 文件损坏或不完整")
-                if (!strict) return@regionLoop
-            }
-            val name = rf.fileName.toString()
-            val efile = entitiesDir.resolve(name)
-            val pfile = poiDir.resolve(name)
-            val cr = try { ioFactory.openReader(fs, rf) } catch (_: Exception) {
-                onError(rf, ERR_MCA, "无法读取 MCA 文件")
-                return@regionLoop
-            }
-            val cw = ioFactory.createWriter(fs, targetDim.resolve("region").resolve(name))
-            val er: McaReaderLike? = try {
-                if (java.nio.file.Files.isRegularFile(fs.toRealPath(efile)) && McaUtils.isValidMca(fs, efile)) {
-                    ioFactory.openReader(fs, efile)
-                } else null
-            } catch (_: Exception) {
-                onError(efile, ERR_ENTITIES, "读取实体失败")
-                null
-            }
-            val pr: McaReaderLike? = try {
-                if (java.nio.file.Files.isRegularFile(fs.toRealPath(pfile)) && McaUtils.isValidMca(fs, pfile)) {
-                    ioFactory.openReader(fs, pfile)
-                } else null
-            } catch (_: Exception) {
-                onError(pfile, ERR_POI, "读取 POI 失败")
-                null
-            }
-            val ew = if (er != null) ioFactory.createWriter(fs, targetDim.resolve("entities").resolve(name)) else null
-            val pw = if (pr != null) ioFactory.createWriter(fs, targetDim.resolve("poi").resolve(name)) else null
+
+        val regionFiles = fs.list(regionDir).filter { p -> p.toString().endsWith(".mca") }
+
+        if (regionParallelism > 1 && regionFiles.size > 1) {
+            // Parallel region processing
+            val executor = java.util.concurrent.Executors.newFixedThreadPool(regionParallelism)
             try {
-                val entries = try { cr.entries() } catch (_: Exception) {
-                    onError(rf, ERR_ENTRIES, "读取区块条目失败")
-                    emptyList()
+                val futures = regionFiles.map { rf ->
+                    executor.submit(java.util.concurrent.Callable {
+                        processSingleRegion(
+                            fs, ioFactory, inputDim, targetDim, patterns,
+                            onError, progressSink, totalChunks, progressInterval,
+                            progressIntervalMs, processedCounter, strict,
+                            useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun
+                        )
+                    })
                 }
-                for (entry in entries) {
-                    var keep = false
-                    for (p in patterns) {
-                        try {
-                            if (p.matches(entry)) { keep = true; break }
-                        } catch (_: Exception) {
-                            onError(rf, ERR_PATTERN, "匹配模式失败")
-                        }
-                    }
-                    if (keep) {
-                        try { cw.writeEntry(entry) } catch (_: Exception) { onError(rf, ERR_WRITE, "写入条目失败") }
-                        try {
-                            val eentry = er?.get(entry.regionIndex())
-                            if (eentry != null && ew != null) {
-                                try { ew.writeEntry(eentry) } catch (_: Exception) { onError(efile, ERR_WRITE_ENTITIES, "写入实体条目失败") }
-                            }
-                        } catch (_: Exception) {
-                            onError(efile, ERR_ENTITIES, "读取实体失败")
-                        }
-                        try {
-                            val pentry = pr?.get(entry.regionIndex())
-                            if (pentry != null && pw != null) {
-                                try { pw.writeEntry(pentry) } catch (_: Exception) { onError(pfile, ERR_WRITE_POI, "写入 POI 条目失败") }
-                            }
-                        } catch (_: Exception) {
-                            onError(pfile, ERR_POI, "读取 POI 失败")
-                        }
-                    } else {
-                        removedTotal += 1
-                    }
-                    val processed = processedCounter.incrementAndGet()
-                    if (useTime) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastEmit >= progressIntervalMs) {
-                            progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
-                            lastEmit = now
-                        }
-                    } else if (progressInterval > 0 && processed % progressInterval == 0L) {
-                        progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                futures.forEach { f ->
+                    try {
+                        val r = f.get()
+                        removedTotal += r.removed
+                    } catch (e: Exception) {
+                        onError(inputDim, "Parallel", "Region parallel processing failed: ${e.message ?: "unknown error"}")
                     }
                 }
-                try { cw.finalizeFile() } catch (_: Exception) { onError(rf, ERR_FINALIZE, "完成写入失败") }
-                try { ew?.finalizeFile() } catch (_: Exception) { onError(efile, ERR_FINALIZE_ENTITIES, "完成实体写入失败") }
-                try { pw?.finalizeFile() } catch (_: Exception) { onError(pfile, ERR_FINALIZE_POI, "完成 POI 写入失败") }
             } finally {
-                try { cr.close() } catch (_: Exception) {}
-                try { cw.close() } catch (_: Exception) {}
-                try { er?.close() } catch (_: Exception) {}
-                try { pr?.close() } catch (_: Exception) {}
-                try { ew?.close() } catch (_: Exception) {}
-                try { pw?.close() } catch (_: Exception) {}
+                executor.shutdown()
+            }
+        } else {
+            // Sequential region processing (original behavior)
+            regionFiles.forEach { rf ->
+                val r = processSingleRegion(
+                    fs, ioFactory, inputDim, targetDim, patterns,
+                    onError, progressSink, totalChunks, progressInterval,
+                    progressIntervalMs, processedCounter, strict,
+                    useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun
+                )
+                removedTotal += r.removed
             }
         }
+
         progressSink.emit(ProgressEvent(ProgressStage.DimensionEnd, null, null, inputDim.toString(), null))
         return DimensionResult(processedCounter.get(), removedTotal)
+    }
+
+    private fun processSingleRegion(
+        fs: FileSystem,
+        ioFactory: McaIOFactory,
+        inputDim: Path,
+        targetDim: Path,
+        patterns: List<ChunkPattern>,
+        onError: (Path, String, String) -> Unit,
+        progressSink: ProgressSink,
+        totalChunks: Long,
+        progressInterval: Long,
+        progressIntervalMs: Long,
+        processedCounter: java.util.concurrent.atomic.AtomicLong,
+        strict: Boolean,
+        useTime: Boolean,
+        lastEmit: Long,
+        regionDir: Path,
+        entitiesDir: Path,
+        poiDir: Path,
+        rf: Path,
+        dryRun: Boolean = false
+    ): RegionResult {
+        var localRemoved = 0L
+        var localLastEmit = lastEmit
+
+        progressSink.emit(ProgressEvent(ProgressStage.RegionStart, null, null, rf.toString(), null))
+        if (!McaUtils.isValidMca(fs, rf)) {
+            onError(rf, ERR_MCA, "MCA file is corrupted or incomplete")
+            if (!strict) return RegionResult(0, 0)
+        }
+        val name = rf.fileName.toString()
+        val efile = entitiesDir.resolve(name)
+        val pfile = poiDir.resolve(name)
+        val cr = try { ioFactory.openReader(fs, rf) } catch (e: Exception) {
+            onError(rf, ERR_MCA, "Failed to read MCA file: ${e.message}")
+            return RegionResult(0, 0)
+        }
+        val cw = if (!dryRun) ioFactory.createWriter(fs, targetDim.resolve("region").resolve(name)) else null
+        val er: McaReaderLike? = try {
+            if (fs.isRegularFile(efile) && McaUtils.isValidMca(fs, efile)) {
+                ioFactory.openReader(fs, efile)
+            } else null
+        } catch (e: Exception) {
+            onError(efile, ERR_ENTITIES, "Failed to read entities: ${e.message}")
+            null
+        }
+        val pr: McaReaderLike? = try {
+            if (fs.isRegularFile(pfile) && McaUtils.isValidMca(fs, pfile)) {
+                ioFactory.openReader(fs, pfile)
+            } else null
+        } catch (e: Exception) {
+            onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
+            null
+        }
+        val ew = if (!dryRun && er != null) ioFactory.createWriter(fs, targetDim.resolve("entities").resolve(name)) else null
+        val pw = if (!dryRun && pr != null) ioFactory.createWriter(fs, targetDim.resolve("poi").resolve(name)) else null
+        try {
+            val entries = try { cr.entries() } catch (e: Exception) {
+                onError(rf, ERR_ENTRIES, "Failed to read chunk entries: ${e.message}")
+                emptyList()
+            }
+            for (entry in entries) {
+                var keep = false
+                for (p in patterns) {
+                    try {
+                        if (p.matches(entry)) { keep = true; break }
+                    } catch (e: Exception) {
+                        onError(rf, ERR_PATTERN, "Pattern matching failed: ${e.message}")
+                    }
+                }
+                if (keep) {
+                    try { cw?.writeEntry(entry) } catch (e: Exception) { onError(rf, ERR_WRITE, "Failed to write entry: ${e.message}") }
+                    try {
+                        val eentry = er?.get(entry.regionIndex())
+                        if (eentry != null && ew != null) {
+                            try { ew.writeEntry(eentry) } catch (e: Exception) { onError(efile, ERR_WRITE_ENTITIES, "Failed to write entity entry: ${e.message}") }
+                        }
+                    } catch (e: Exception) {
+                        onError(efile, ERR_ENTITIES, "Failed to read entities: ${e.message}")
+                    }
+                    try {
+                        val pentry = pr?.get(entry.regionIndex())
+                        if (pentry != null && pw != null) {
+                            try { pw.writeEntry(pentry) } catch (e: Exception) { onError(pfile, ERR_WRITE_POI, "Failed to write POI entry: ${e.message}") }
+                        }
+                    } catch (e: Exception) {
+                        onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
+                    }
+                } else {
+                    localRemoved += 1
+                }
+                val processed = processedCounter.incrementAndGet()
+                if (useTime) {
+                    val now = System.currentTimeMillis()
+                    if (now - localLastEmit >= progressIntervalMs) {
+                        progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                        localLastEmit = now
+                    }
+                } else if (progressInterval > 0 && processed % progressInterval == 0L) {
+                    progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                }
+            }
+            try { cw?.finalizeFile() } catch (e: Exception) { onError(rf, ERR_FINALIZE, "Failed to finalize write: ${e.message}") }
+            try { ew?.finalizeFile() } catch (e: Exception) { onError(efile, ERR_FINALIZE_ENTITIES, "Failed to finalize entity write: ${e.message}") }
+            try { pw?.finalizeFile() } catch (e: Exception) { onError(pfile, ERR_FINALIZE_POI, "Failed to finalize POI write: ${e.message}") }
+        } finally {
+            try { cr.close() } catch (_: Exception) {}
+            try { cw?.close() } catch (_: Exception) {}
+            try { er?.close() } catch (_: Exception) {}
+            try { pr?.close() } catch (_: Exception) {}
+            try { ew?.close() } catch (_: Exception) {}
+            try { pw?.close() } catch (_: Exception) {}
+        }
+
+        return RegionResult(0, localRemoved)
     }
 }

@@ -5,6 +5,13 @@ import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/**
+ * Writes Minecraft Anvil region files (.mca).
+ *
+ * Supports writing chunk entries with 4 KiB sector alignment and generating
+ * the location/timestamp header tables. Call [writeEntry] for each chunk,
+ * then [finalizeFile] to flush the header, then [close].
+ */
 class McaWriter(path: String) {
     private val file = RandomAccessFile(File(path), "rw")
     private var dataOffset = 8192L

@@ -7,7 +7,9 @@ import java.time.format.DateTimeFormatter
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 
+/** Utilities for compressing world output directories. */
 object Compressor {
+    /** Compress [root] into a sibling ZIP file named `yyyyMMddHHmmss.zip`, then return its path. */
     fun compressToTimestampZip(root: Path): Path {
         val ts = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMddHHmmss"))
         val parent = root.parent ?: root

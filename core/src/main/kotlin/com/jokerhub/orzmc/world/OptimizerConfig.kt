@@ -24,7 +24,8 @@ data class OutputOptions(
     val inPlace: Boolean = false,
     val zipOutput: Boolean = false,
     val force: Boolean = false,
-    val copyMisc: Boolean = true
+    val copyMisc: Boolean = true,
+    val dryRun: Boolean = false
 )
 
 data class ProgressOptions(
@@ -99,6 +100,12 @@ class OptimizerRequestBuilder internal constructor(
         get() = outputOptions.copyMisc
         set(value) {
             outputOptions = outputOptions.copy(copyMisc = value)
+        }
+
+    var dryRun: Boolean
+        get() = outputOptions.dryRun
+        set(value) {
+            outputOptions = outputOptions.copy(dryRun = value)
         }
 
     var progressInterval: Long
@@ -265,7 +272,8 @@ class OutputOptionsBuilder internal constructor(base: OutputOptions) {
     var zipOutput: Boolean = base.zipOutput
     var force: Boolean = base.force
     var copyMisc: Boolean = base.copyMisc
-    fun build(): OutputOptions = OutputOptions(inPlace, zipOutput, force, copyMisc)
+    var dryRun: Boolean = base.dryRun
+    fun build(): OutputOptions = OutputOptions(inPlace, zipOutput, force, copyMisc, dryRun)
 }
 
 class ProgressOptionsBuilder internal constructor(base: ProgressOptions) {

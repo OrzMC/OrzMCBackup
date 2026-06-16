@@ -78,21 +78,20 @@ class NbtForceLoaderTest {
 
     @Test
     fun `parse new tickets format`() {
-        val tagLong = 0x04.toByte()
         val tagString = 0x08.toByte()
-        val tagList = 0x09.toByte()
-        val tagCompound = 0x0A.toByte()
         val tagIntArray = 0x0B.toByte()
-        val tagEnd = 0x00.toByte()
+        val tagCompound = 0x0A
+        val tagList = 0x09
+        val tagEnd = 0x00
 
         val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
+            writeByte(tagCompound) // TAG_Compound (root)
             writeNbtString("")
-            writeByte(0x0A) // TAG_Compound "data"
+            writeByte(tagCompound) // TAG_Compound "data"
             writeNbtString("data")
-            writeByte(0x09) // TAG_List "tickets"
+            writeByte(tagList) // TAG_List "tickets"
             writeNbtString("tickets")
-            writeByte(0x0A) // element type: TAG_Compound
+            writeByte(tagCompound) // element type: TAG_Compound
             writeInt(3) // 3 tickets
 
             // Ticket 1: forced chunk (3, 4)
@@ -113,8 +112,8 @@ class NbtForceLoaderTest {
                 "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(5); writeInt(6) })
             )
 
-            writeByte(0) // TAG_End (data)
-            writeByte(0) // TAG_End (root)
+            writeByte(tagEnd) // TAG_End (data)
+            writeByte(tagEnd) // TAG_End (root)
         }
 
         val result = NbtForceLoader.parse(java.io.File.createTempFile("chunks", ".dat").apply {
@@ -177,5 +176,63 @@ class NbtForceLoaderTest {
         })
 
         assertTrue(result.isEmpty(), "empty forced array should return empty list")
+    }
+
+    @Test
+    fun `oversized byte array is rejected with custom limit`() {
+        val data = buildChunksDat {
+            writeByte(0x0A) // TAG_Compound (root)
+            writeNbtString("")
+            writeByte(0x0A) // TAG_Compound "data"
+            writeNbtString("data")
+            writeByte(0x07) // TAG_Byte_Array "oversized"
+            writeNbtString("oversized")
+            writeInt(101) // exceeds custom maxArraySize=100
+            writeByte(0) // TAG_End (data)
+            writeByte(0) // TAG_End (root)
+        }
+        assertThrows(
+            IllegalArgumentException::class.java,
+            {
+                NbtForceLoader.parse(
+                    java.io.File.createTempFile("chunks", ".dat").apply {
+                        writeBytes(data)
+                        deleteOnExit()
+                    },
+                    maxArraySize = 100
+                )
+            },
+            "oversized byte array should be rejected"
+        )
+    }
+
+    @Test
+    fun `oversized list is rejected with custom limit`() {
+        val maxListLength = 5
+        val data = buildChunksDat {
+            writeByte(0x0A) // TAG_Compound (root)
+            writeNbtString("")
+            writeByte(0x0A) // TAG_Compound "data"
+            writeNbtString("data")
+            writeByte(0x09) // TAG_List "tickets"
+            writeNbtString("tickets")
+            writeByte(0x0A) // element type: TAG_Compound
+            writeInt(maxListLength + 1) // exceeds custom limit
+            writeByte(0) // TAG_End (data)
+            writeByte(0) // TAG_End (root)
+        }
+        assertThrows(
+            IllegalArgumentException::class.java,
+            {
+                NbtForceLoader.parse(
+                    java.io.File.createTempFile("chunks", ".dat").apply {
+                        writeBytes(data)
+                        deleteOnExit()
+                    },
+                    maxListLength = maxListLength
+                )
+            },
+            "oversized list should be rejected"
+        )
     }
 }
