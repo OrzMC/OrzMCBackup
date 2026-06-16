@@ -42,17 +42,13 @@ tasks.test {
 }
 
 
-tasks.matching { it.name == "shadowJar" }.configureEach {
-    (this as com.gradleup.shadow.tasks.ShadowJar).apply {
-        archiveBaseName.set("backup")
-        archiveClassifier.set("")
-        manifest {
-            attributes(
-                mapOf(
-                    "Main-Class" to "com.jokerhub.orzmc.cli.Main",
-                    "Implementation-Version" to project.version.toString()
-                )
-            )
-        }
+tasks.named<com.gradleup.shadow.tasks.ShadowJar>("shadowJar") {
+    archiveBaseName.set("backup")
+    archiveClassifier.set("")
+    manifest {
+        attributes(mapOf<String, Any>(
+            "Main-Class" to "com.jokerhub.orzmc.cli.Main",
+            "Implementation-Version" to project.version.toString()
+        ))
     }
 }
