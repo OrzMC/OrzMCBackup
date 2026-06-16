@@ -16,6 +16,8 @@ import java.util.concurrent.Callable
     versionProvider = BuildVersionProvider::class
 )
 class Main : Callable<Int> {
+    var logger: LoggerSink = ConsoleLoggerSink()
+
     @Parameters(index = "0", description = ["Minecraft world root"], paramLabel = "WORLD_DIR")
     lateinit var input: Path
 
@@ -111,54 +113,54 @@ class Main : Callable<Int> {
                 ProgressMode.Off -> null
                 else -> { e ->
                     when (e.stage) {
-                        ProgressStage.Init -> println("开始")
+                        ProgressStage.Init -> logger.info("开始")
                         ProgressStage.Discover -> {
                             val t = e.total ?: 0
-                            println("扫描与统计区块，总数：$t")
+                            logger.info("扫描与统计区块，总数：$t")
                         }
-                        ProgressStage.DimensionStart -> println("处理维度：${e.path}")
-                        ProgressStage.RegionStart -> if (progressMode == ProgressMode.Region) println("处理区块文件：${e.path}")
+                        ProgressStage.DimensionStart -> logger.info("处理维度：${e.path}")
+                        ProgressStage.RegionStart -> if (progressMode == ProgressMode.Region) logger.info("处理区块文件：${e.path}")
                         ProgressStage.ChunkProgress -> {
                             val cur = e.current ?: 0
                             val tot = e.total ?: 0
                             if (progressMode == ProgressMode.Global) {
                                 val percent = if (tot > 0) (cur * 100) / tot else 0
-                                println("进度：$percent%（$cur/$tot）")
+                                logger.info("进度：$percent%（$cur/$tot）")
                             }
                         }
-                        ProgressStage.Finalize -> println("完成写入：${e.path}")
-                        ProgressStage.CopyMisc -> println("复制杂项文件")
+                        ProgressStage.Finalize -> logger.info("完成写入：${e.path}")
+                        ProgressStage.CopyMisc -> logger.info("复制杂项文件")
                         ProgressStage.CopyMiscProgress -> {
                             val cur = e.current ?: 0
                             val tot = e.total ?: 0
                             if (progressMode == ProgressMode.Global) {
                                 val percent = if (tot > 0) (cur * 100) / tot else 0
-                                println("进度：$percent%（$cur/$tot）")
+                                logger.info("进度：$percent%（$cur/$tot）")
                             }
                         }
                         ProgressStage.Compress -> {
-                            println("压缩输出目录")
+                            logger.info("压缩输出目录")
                             val cur = e.current ?: 0
                             val tot = e.total ?: 0
                             if (progressMode == ProgressMode.Global) {
                                 val percent = if (tot > 0) (cur * 100) / tot else 0
-                                println("进度：$percent%（$cur/$tot）")
+                                logger.info("进度：$percent%（$cur/$tot）")
                             }
                         }
                         ProgressStage.Cleanup -> {
-                            println("清理输出目录")
+                            logger.info("清理输出目录")
                             val cur = e.current ?: 0
                             val tot = e.total ?: 0
                             if (progressMode == ProgressMode.Global) {
                                 val percent = if (tot > 0) (cur * 100) / tot else 0
-                                println("进度：$percent%（$cur/$tot）")
+                                logger.info("进度：$percent%（$cur/$tot）")
                             }
                         }
-                        ProgressStage.DimensionEnd -> println("维度完成：${e.path}")
+                        ProgressStage.DimensionEnd -> logger.info("维度完成：${e.path}")
                         ProgressStage.Done -> {
                             val cur = e.current ?: 0
                             val tot = e.total ?: 0
-                            println("完成：$cur/$tot")
+                            logger.info("完成：$cur/$tot")
                         }
                     }
                 }
@@ -187,14 +189,14 @@ class Main : Callable<Int> {
                 hooks = Hooks(reportSink = reportSink)
             )
             val r = Optimizer.run(request)
-            if (report) println(ReportIO.toText(r))
-            reportFile?.let { path -> println("报告已写入：$path") }
+            if (report) logger.info(ReportIO.toText(r))
+            reportFile?.let { path -> logger.info("报告已写入：$path") }
             if (strict && r.errors.isNotEmpty()) 1 else 0
         } catch (e: OptimizeException) {
-            System.err.println(e.message ?: "发生错误")
+            logger.error(e.message ?: "发生错误")
             1
         } catch (e: Exception) {
-            System.err.println("发生错误：" + (e.message ?: e.toString()))
+            logger.error("发生错误：" + (e.message ?: e.toString()))
             1
         }
     }

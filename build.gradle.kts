@@ -1,6 +1,7 @@
 plugins {
     kotlin("jvm") version "1.9.22" apply false
     id("com.github.johnrengelman.shadow") version "8.1.1" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.7.5" apply false
 }
 
 val releasedVersion = (findProperty("version") as String?) ?: "0.1.0"

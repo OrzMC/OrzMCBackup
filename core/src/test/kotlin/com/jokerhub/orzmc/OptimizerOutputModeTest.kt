@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
+import java.util.zip.ZipFile
 import kotlin.streams.toList
 
 class OptimizerOutputModeTest {
@@ -68,6 +69,48 @@ class OptimizerOutputModeTest {
         assertEquals(2, report.processedChunks)
         assertEquals(1, report.removedChunks)
         assertEquals(1, count)
+        Cleaner.deleteTreeWithRetry(input, 5, 10)
+    }
+
+    @Test
+    fun `zipOutput contains valid mca files`() {
+        val input = createWorldWithEntries(
+            listOf(
+                McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW),
+                McaMemoryBuilder.MemChunk(index = 1, inhabited = 1000, kind = CompressionKind.RAW)
+            )
+        )
+        val out = TestTmp.createTempDirectory("optimizer-out-zip-verify-")
+        val parent = out.parent
+        val before = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
+        Optimizer.run(
+            OptimizerRequest(
+                input = input,
+                output = out,
+                filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                outputOptions = OutputOptions(zipOutput = true, force = true)
+            )
+        )
+        val after = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
+        val zipFiles = after.filter { p -> before.none { it.toString() == p.toString() } }
+        assertEquals(1, zipFiles.size, "should create exactly one zip file")
+        val zipPath = zipFiles.first()
+
+        // Verify ZIP file content
+        ZipFile(zipPath.toFile()).use { zip ->
+            val entries = zip.entries().asSequence().toList()
+            val mcaEntries = entries.filter { it.name.endsWith(".mca") }
+            assertTrue(mcaEntries.isNotEmpty(), "zip should contain .mca files")
+            val regionEntry = mcaEntries.find { it.name.contains("region") }
+            assertTrue(regionEntry != null, "zip should contain region directory")
+
+            // Read an MCA file from inside the ZIP and verify it has entries
+            val mcaEntry = mcaEntries.first()
+            val mcaBytes = zip.getInputStream(mcaEntry).use { it.readBytes() }
+            assertTrue(mcaBytes.size >= 8192, "mca file inside zip should be >= 8192 bytes")
+        }
+        assertFalse(Files.exists(out), "output directory should be removed after zip")
+        zipFiles.forEach { Files.deleteIfExists(it) }
         Cleaner.deleteTreeWithRetry(input, 5, 10)
     }
 }

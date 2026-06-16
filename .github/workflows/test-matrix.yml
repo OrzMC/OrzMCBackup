@@ -24,6 +24,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v3
       - name: Run tests on ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-ubuntu-${{ matrix.java }}
+          path: |
+            core/build/reports/tests/
+            app/build/reports/tests/
   windows-tests:
     runs-on: windows-latest
     strategy:
@@ -42,6 +50,14 @@ jobs:
       - name: Run tests on Windows Java ${{ matrix.java }}
         shell: pwsh
         run: .\gradlew.bat :core:test :app:test --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-windows-${{ matrix.java }}
+          path: |
+            core/build/reports/tests/
+            app/build/reports/tests/
   macos-tests:
     runs-on: macos-latest
     strategy:
@@ -66,5 +82,32 @@ jobs:
           java -XshowSettings:properties -version 2>&1 | grep -i 'java.io.tmpdir' || true
           ./gradlew :core:printTestPaths --no-daemon || true
       - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v3
       - name: Run tests on macOS Java ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-report-macos-${{ matrix.java }}
+          path: |
+            core/build/reports/tests/
+            app/build/reports/tests/
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Run tests with coverage
+        run: ./gradlew :core:koverXmlReport --no-daemon
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: core/build/reports/kover/

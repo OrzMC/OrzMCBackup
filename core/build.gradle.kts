@@ -5,7 +5,9 @@ plugins {
     kotlin("jvm")
     `maven-publish`
     signing
+    `java-test-fixtures`
     id("org.jetbrains.dokka") version "1.9.20"
+    id("org.jetbrains.kotlinx.kover")
 }
 
 
