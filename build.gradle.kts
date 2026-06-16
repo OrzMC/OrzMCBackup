@@ -1,7 +1,7 @@
 plugins {
-    kotlin("jvm") version "1.9.24" apply false
+    kotlin("jvm") version "2.1.0" apply false
     id("com.github.johnrengelman.shadow") version "8.1.1" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.7.5" apply false
+    id("org.jetbrains.kotlinx.kover") version "0.8.3" apply false
 }
 
 // Ensure JDK 21+ for Kotlin compiler compatibility
