@@ -26,7 +26,7 @@ jobs:
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-ubuntu-${{ matrix.java }}
           path: |
@@ -52,7 +52,7 @@ jobs:
         run: .\gradlew.bat :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-windows-${{ matrix.java }}
           path: |
@@ -87,7 +87,7 @@ jobs:
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: test-report-macos-${{ matrix.java }}
           path: |
@@ -107,7 +107,7 @@ jobs:
       - name: Run tests with coverage
         run: ./gradlew :core:koverXmlReport --no-daemon
       - name: Upload coverage report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: core/build/reports/kover/
