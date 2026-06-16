@@ -21,7 +21,7 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
@@ -46,7 +46,7 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on Windows Java ${{ matrix.java }}
         shell: pwsh
         run: .\gradlew.bat :core:test :app:test --no-daemon
@@ -81,8 +81,8 @@ jobs:
           echo "TMPDIR env: ${TMPDIR:-unset}"
           java -XshowSettings:properties -version 2>&1 | grep -i 'java.io.tmpdir' || true
           ./gradlew :core:printTestPaths --no-daemon || true
-      - uses: gradle/actions/setup-gradle@v3
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests on macOS Java ${{ matrix.java }}
         run: ./gradlew :core:test :app:test --no-daemon
       - name: Upload test report
@@ -103,7 +103,7 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: gradle
-      - uses: gradle/actions/setup-gradle@v3
+      - uses: gradle/actions/setup-gradle@v6
       - name: Run tests with coverage
         run: ./gradlew :core:koverXmlReport --no-daemon
       - name: Upload coverage report
