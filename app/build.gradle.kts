@@ -10,7 +10,7 @@ plugins {
 
 dependencies {
     implementation(project(":core"))
-    implementation("info.picocli:picocli:4.7.6")
+    implementation("info.picocli:picocli:4.7.7")
     testImplementation(testFixtures(project(":core")))
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.1")
     testImplementation("org.junit.jupiter:junit-jupiter-params:5.10.1")
