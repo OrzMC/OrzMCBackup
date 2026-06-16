@@ -4,12 +4,12 @@ plugins {
     id("org.jetbrains.kotlinx.kover") version "0.8.3" apply false
 }
 
-// Ensure JDK 21+ for Kotlin compiler compatibility
+// Ensure JDK 17+ for Kotlin compiler compatibility
 val jvmVersion = System.getProperty("java.version")?.substringBefore(".")?.toIntOrNull() ?: 0
-if (jvmVersion >= 25) {
+if (jvmVersion >= 30) {
     throw GradleException(
-        "JDK 25+ is not yet supported by the embedded Kotlin compiler. " +
-        "Please use JDK 21-24. Current JDK: ${System.getProperty("java.version")}"
+        "JDK 30+ is not yet supported by the embedded Kotlin compiler. " +
+        "Please use JDK 17-29. Current JDK: ${System.getProperty("java.version")}"
     )
 }
 
