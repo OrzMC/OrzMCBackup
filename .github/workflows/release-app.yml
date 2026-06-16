@@ -50,7 +50,7 @@ jobs:
             app/build/libs/backup-${{ env.VERSION }}.jar.sha256
       - name: Publish GitHub Release (app)
         if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: v${{ env.VERSION }}
           name: OrzMCBackup CLI v${{ env.VERSION }}
