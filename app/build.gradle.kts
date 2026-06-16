@@ -42,11 +42,11 @@ tasks.test {
 }
 
 
-tasks.named<com.gradleup.shadow.tasks.ShadowJar>("shadowJar") {
+tasks.withType<Jar>().named("shadowJar") {
     archiveBaseName.set("backup")
     archiveClassifier.set("")
     manifest {
-        attributes(mapOf<String, Any>(
+        attributes(mapOf(
             "Main-Class" to "com.jokerhub.orzmc.cli.Main",
             "Implementation-Version" to project.version.toString()
         ))
