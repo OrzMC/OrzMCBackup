@@ -125,8 +125,9 @@ class IoTimingTest {
         Optimizer.run(parallelRequest)
         val parallelMs = (System.nanoTime() - parallelStart) / 1_000_000
 
-        // Allow 3x slack (parallel overhead can be significant on small workloads)
-        val maxSlack = 3.0
+        // Allow generous slack — parallel overhead on CI runners can
+        // significantly inflate wall-clock time for tiny in-memory workloads
+        val maxSlack = 5.0
         if (serialMs > 0 && parallelMs > serialMs * maxSlack) {
             throw AssertionError(
                 "Parallel (${parallelMs}ms) is more than ${maxSlack}x slower than serial (${serialMs}ms)",
