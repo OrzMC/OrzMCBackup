@@ -24,9 +24,6 @@ complexity:
 exceptions:
   TooGenericExceptionCaught:
     active: false
-  # 允许 catch Exception（顶级 CLI 入口）
-  IllegalVariableSource:
-    active: false
 
 comments:
   # 允许缺少注释
