@@ -90,7 +90,7 @@ tasks.register<JavaExec>("printTestPaths") {
 }
 
 tasks.register<Jar>("javadocJar") {
-    dependsOn("dokkaHtml")
+    dependsOn("dokkaGenerateHtml")
     from(layout.buildDirectory.dir("dokka/html"))
     archiveClassifier.set("javadoc")
 }
