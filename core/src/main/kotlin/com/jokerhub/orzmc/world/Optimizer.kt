@@ -165,7 +165,6 @@ object DefaultOptimizer : OptimizerEngine {
 
     // ---- extracted helper methods ----
 
-    @Suppress("LoopWithTooManyJumpStatements")
     private fun resolveOutputDir(
         fs: FileSystem,
         request: OptimizerRequest,
@@ -206,6 +205,7 @@ object DefaultOptimizer : OptimizerEngine {
         return output
     }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun countMiscFiles(
         fs: FileSystem,
         tasks: List<Path>,

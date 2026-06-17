@@ -65,6 +65,7 @@ object NbtForceLoader {
             }
             val tickets = dataTag["tickets"] as? List<*>
             if (tickets != null) {
+                @Suppress("LoopWithTooManyJumpStatements")
                 for (t in tickets) {
                     val tm = t as? Map<*, *> ?: continue
                     val typeStr = tm["type"] as? String ?: continue
