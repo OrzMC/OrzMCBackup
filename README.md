@@ -4,7 +4,6 @@
 [![release-app](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml)
 [![test-matrix](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml)
 [![codecov](https://codecov.io/gh/OrzMC/OrzMCBackup/branch/main/graph/badge.svg)](https://codecov.io/gh/OrzMC/OrzMCBackup)
-[![coverage](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen?logo=kotlin)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 Kotlin/Gradle 独立工程，提供 Minecraft Java 世界优化功能：扫描各维度的 region/entities/poi MCA 文件，根据 InhabitedTime
