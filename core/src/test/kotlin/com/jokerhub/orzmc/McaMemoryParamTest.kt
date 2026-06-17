@@ -12,6 +12,7 @@ class McaMemoryParamTest {
     @ParameterizedTest
     @CsvSource(
         "RAW,0,0",
+        "RAW,50,1",
         "RAW,1000,1",
         "RAW,1001,1",
         "ZLIB,0,0",
