@@ -27,10 +27,6 @@ complexity:
     active: true
     functionThreshold: 20
     constructorThreshold: 10
-  # 解析循环有时需要多个 break/continue（嵌套条件）
-  LoopWithTooManyJumpStatements:
-    active: true
-    maxJumpCount: 3
 
 exceptions:
   TooGenericExceptionCaught:
