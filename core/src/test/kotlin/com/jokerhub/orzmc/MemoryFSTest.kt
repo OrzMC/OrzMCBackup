@@ -3,7 +3,6 @@ package com.jokerhub.orzmc
 import com.jokerhub.orzmc.world.MemoryFS
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.nio.file.Path
 
 class MemoryFSTest {
     @Test

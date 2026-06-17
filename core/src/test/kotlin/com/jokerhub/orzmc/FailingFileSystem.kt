@@ -1,7 +1,6 @@
 package com.jokerhub.orzmc
 
 import com.jokerhub.orzmc.world.FileSystem
-import com.jokerhub.orzmc.world.Cleaner
 import java.io.IOException
 import java.nio.file.Path
 import java.util.concurrent.atomic.AtomicBoolean

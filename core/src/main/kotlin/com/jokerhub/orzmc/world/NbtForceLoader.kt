@@ -3,7 +3,6 @@ package com.jokerhub.orzmc.world
 import java.io.File
 import java.io.BufferedInputStream
 import java.io.DataInputStream
-import java.io.InputStream
 import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPInputStream
 

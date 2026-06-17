@@ -5,8 +5,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.nio.file.Paths
-import java.nio.file.Files
-import org.junit.jupiter.api.Assumptions.assumeTrue
 
 class McaReaderTest {
     @Test
