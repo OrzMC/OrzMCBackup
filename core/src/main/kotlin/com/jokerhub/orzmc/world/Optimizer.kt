@@ -4,7 +4,6 @@ import com.jokerhub.orzmc.patterns.InhabitedTimePattern
 import com.jokerhub.orzmc.patterns.ListPattern
 import java.io.IOException
 import java.nio.file.Path
-import java.nio.file.Paths
 
 enum class ProgressMode { Off, Global, Region }
 
