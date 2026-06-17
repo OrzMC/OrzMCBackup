@@ -1,0 +1,420 @@
+# OrzMCBackup 功能点梳理
+
+> 基于 v0.1.0 代码库，2025-06 版
+
+## 一、项目定位
+
+Minecraft Java 版世界优化工具，双用途：
+- **CLI 工具**：Shadow JAR，基于 picocli，单命令行入口
+- **库（Library）**：发布到 Maven Central，artifact `io.github.wangzhizhou:backup-core`
+
+**核心能力**：扫描世界的 region / entities / POI 的 MCA 文件，根据 InhabitedTime（玩家活跃时间）阈值或强制加载列表移除区块，重写输出。
+
+---
+
+## 二、核心优化引擎
+
+### 2.1 优化器接口与入口
+
+| 功能点 | 说明 |
+|--------|------|
+| `OptimizerEngine` 接口 | 定义 `run(OptimizerRequest)` 和 `run(Path, lambda)` 两种入口 |
+| `DefaultOptimizer` 单例 | 完整实现：维度发现 → 区块计数 → 逐个维度处理 → 输出处理 |
+| `Optimizer` 静态入口 | Java 兼容包装，提供 `@JvmStatic` 的 `run` 方法 |
+
+### 2.2 配置模型
+
+**`OptimizerRequest`** 聚合 6 大子配置：
+
+| 配置类 | 字段 | 功能 |
+|--------|------|------|
+| `FilterOptions` | `inhabitedThresholdSeconds=300` | 活跃时间阈值（秒） |
+| | `removeUnknown=false` | 是否移除外部压缩/不可解析的区块 |
+| | `strict=false` | 严格模式（I/O 错误提升为退出码 1） |
+| `OutputOptions` | `inPlace=false` | 原地替换模式 |
+| | `zipOutput=false` | 输出打包为 ZIP |
+| | `force=false` | 强制覆盖非空输出目录 |
+| | `copyMisc=true` | 复制非 MCA 的杂项文件 |
+| | `dryRun=false` | 预览模式（只统计不写入） |
+| `ProgressOptions` | `interval=1000` | 按区块数的进度回调间隔 |
+| | `intervalMs=0` | 按毫秒的进度回调间隔（>0 时优先） |
+| `RuntimeOptions` | `parallelism=1` | 维度级并行线程数 |
+| `Hooks` | `onError` | 错误回调 lambda |
+| | `reportSink` | 报告输出接收器 |
+| | `metricsSink` | 指标收集接收器 |
+| `IOOptions` | `fs=RealFileSystem` | 文件系统抽象（可注入内存实现） |
+| | `ioFactory=DefaultMcaIOFactory` | MCA 读写器工厂 |
+
+**Builder 模式**：`OptimizerRequestBuilder` 提供流畅 API，支持分组配置（`filter { }`、`output { }` 等）。
+
+---
+
+## 三、世界扫描与维度发现
+
+### 3.1 维度发现（`DefaultOptimizer.discoverDimensions`）
+
+- 递归扫描输入目录
+- 任意包含 `region/` 子目录的路径视为一个维度
+- **兼容 Minecraft 26.1+** 的 `dimensions/minecraft/<dim>/` 嵌套结构
+- 也兼容传统平面布局（`<world>/region/`）
+
+### 3.2 强制加载区块解析（`ForceLoad` + `NbtForceLoader`）
+
+两级探测（按优先级）：
+1. **`data/minecraft/chunk_tickets.dat`**（26.1+ 新版格式）
+   - 解析 `data.tickets[].chunk_pos`，筛选 `type == "minecraft:forced"`
+2. **`data/chunks.dat`**（旧版格式）
+   - 解析 `data.Forced`（LongArray，内联存储 x/z 对）
+
+**NBT 解析器特性**：
+- 支持所有 12 种标准 NBT 标签类型
+- GZip 压缩 NBT 文件读取
+- 安全限制：`maxArraySize=10MB`、`maxListLength=65536`、`maxCompoundDepth=64`
+- 解析失败不中断处理（除非 strict 模式）
+
+### 3.3 区块总数统计（`McaUtils.countTotalChunks`）
+
+- 遍历所有维度的所有 `.mca` 文件
+- 校验文件大小 >= 8192 字节（至少一个完整头部）
+- 错误容错（单文件损坏不影响整体处理）
+
+---
+
+## 四、区块保留策略（ChunkPattern）
+
+### 4.1 `InhabitedTimePattern` — 活跃时间模式
+
+- 基于 `InhabitedTime` NBT long 值做 `>` 比较（严格大于，非 >=）
+- **`threshold=0` 时移除未被玩家访问过的区块**（即 `InhabitedTime == 0`）
+- **字节级扫描**：搜索 `[TAG_Long(1)][name_length(2)]["InhabitedTime"(13)]` 模式，直接读后面 8 字节
+  - 无需完整 NBT 反序列化，性能更高
+- `removeUnknown` 标志控制外部压缩/不可解析区块的处理
+
+### 4.2 `ListPattern` — 坐标列表模式
+
+- 根据全局 `(x, z)` 坐标列表保留区块
+- 用于强制加载区块的保留，也可用于自定义保留列表
+
+### 4.3 `RangePattern` — 矩形区域模式
+
+- 保留矩形 `(minX, minZ) ~ (maxX, maxZ)` 内的所有区块
+- 自动坐标归一化（不要求用户传入的顺序）
+
+### 4.4 模式组合
+
+优化器始终合并两种模式：`ListPattern(forced) + InhabitedTimePattern(ticks, removeUnknown)`
+- 顺序：按列表顺序评估
+- **匹配任意一个模式 → 保留区块**
+- 均不匹配 → 移除区块
+
+---
+
+## 五、维度处理（DimensionProcessor）
+
+### 5.1 目录结构重建
+
+- 创建输出维度的 `region/`、`entities/`、`poi/` 子目录
+- 仅当输入中有对应目录时才创建（兼容维度没有 entities/poi 的情况）
+
+### 5.2 区块级处理
+
+| 功能点 | 说明 |
+|--------|------|
+| MCA 文件验证 | 检查文件大小 >= 8192 字节 |
+| 三文件联动 | 处理一个区块时，同时读写 `*.mca` + `entities/*.mca` + `poi/*.mca` |
+| 惰性写入 | 仅当至少一个区块被保留时才创建 `McaWriter`，避免写入空文件 |
+| 扇区对齐 | 写入数据填零至 4KiB 边界，符合 Minecraft Anvil 格式 |
+| 头部刷新 | `finalizeFile()` 确保位置表和时戳表写入文件头部 |
+| 资源清理 | try/finally 确保所有 reader/writer 关闭 |
+| 区域级并行 | 可选线程池并行处理多个 .mca 文件 |
+
+### 5.3 错误种类
+
+独立错误常量：`ERR_MCA`、`ERR_ENTITIES`、`ERR_POI`、`ERR_ENTRIES`、`ERR_PATTERN`、`ERR_WRITE`、`ERR_WRITE_ENTITIES`、`ERR_WRITE_POI`、`ERR_FINALIZE`、`ERR_FINALIZE_ENTITIES`、`ERR_FINALIZE_POI`、`ERR_PARALLEL`
+
+---
+
+## 六、输出处理
+
+### 6.1 原地替换（In-Place）
+
+1. 处理到临时目录 `thanos-*` 或 `thanos-dry-*`
+2. 将新 MCA 文件从临时目录复制回源目录
+3. 删除已不存在于输出的 MCA 文件
+4. 清理临时目录
+
+### 6.2 杂项文件复制（Copy Misc）
+
+- 复制维度目录下除 `region/`、`entities/`、`poi/` 外的所有文件和目录
+- 通过 `OutputOptions.copyMisc` 开关控制
+
+### 6.3 ZIP 打包
+
+- 通过 `Compressor.compressToTimestampZip` 将输出目录打包为 `yyyyMMddHHmmss.zip`
+- 使用标准 `ZipOutputStream`
+
+### 6.4 清理器（Cleaner）
+
+- Windows DOS 属性清除：`clearDosAttributes()` 移除只读/隐藏属性
+- 带重试的目录树删除：`deleteTreeWithRetry(root, attempts, sleepMs)`
+- 逆序遍历（先清空子文件再删目录）
+
+### 6.5 预览模式（Dry Run）
+
+`dryRun=true` 时只扫描和统计，不写入任何文件，不改动输入目录。
+
+---
+
+## 七、MCA 文件格式库（`mca/` 包）
+
+### 7.1 随机访问抽象（`RandomAccess`）
+
+三层实现：
+| 实现类 | 特点 |
+|--------|------|
+| `RafAccess` | 包装 `java.io.RandomAccessFile`，直接系统调用 |
+| `BufferedRafAccess` | **8KiB 对齐读缓冲**，减少系统调用，适合连续扇区访问 |
+| `MemoryAccess` | 基于 `ByteArray` 的内存模式，用于测试 |
+
+### 7.2 MCA 读取器（`McaReader`）
+
+- 解析文件名 `r.x.z.mca` 提取区域坐标
+- 读取 8KiB 头部（4KiB 位置表 + 4KiB 时间戳表）
+- 位置表解码：`(offset_in_sectors << 8) \| size_in_sectors`
+- `entries()` 返回所有非空扇区条目
+- 支持文件模式和内存模式打开
+
+### 7.3 MCA 写入器（`McaWriter`）
+
+- 空文件初始化（首 8192 字节填零）
+- `writeEntry()`：4KiB 对齐写入
+- `finalizeFile()`：刷新 8KiB 头部并 fsync
+
+### 7.4 MCA 条目（`McaEntry`）
+
+**坐标计算**：
+- `regionIndex()` → 扇区槽位 0-1023
+- `xPos()` / `zPos()` → 区域内局部坐标（`index % 32` / `index / 32`）
+- `globalX()` / `globalZ()` → 世界空间坐标
+
+**压缩格式**（9 种）：
+- 标准：`GZIP`、`ZLIB`、`RAW`、`LZ4`
+- 扩展（外部存储）：`EXT_GZIP`、`EXT_ZLIB`、`EXT_RAW`、`EXT_LZ4`
+- 自定义：`CUSTOM`（128 字节名称）
+
+**数据访问**：
+- `serializedBytes()` → 完整头部+压缩数据，供写入用
+- `dataBytes()` → 解析为 `(CompressionMethod, ByteArray, customName?)`
+- `allDataUncompressed()` → 完整解压为原始字节
+- `isExternal()` → 检查是否为外部压缩格式
+
+**LZ4 解码**：
+- 读取 LZ4Block 格式：魔数 `LZ4Block` + 1 byte token + 压缩/解压长度 + xxhash32
+- Token `0x10` = 原始（未压缩）、`0x20` = LZ4 压缩
+- 使用 `net.jpountz.lz4.LZ4Factory.safeInstance().safeDecompressor()`
+- xxhash 校验和种子 `0x9747b28c`，比较时 `mask & 0x0FFFFFFF`
+
+---
+
+## 八、进度与报告
+
+### 8.1 进度报告（`ProgressSink` + `ProgressEvent`）
+
+**12 个进度阶段**：
+`Init → Discover → DimensionStart → RegionStart → ChunkProgress → DimensionEnd → Finalize → CopyMisc → CopyMiscProgress → Compress → Cleanup → Done`
+
+**双模式节流**：
+- 按区块数：`processed % progressInterval == 0`
+- 按时间：`now - lastEmit >= progressIntervalMs`（时间模式优先）
+
+**实现**：`NoopProgressSink`（丢弃）、`CallbackProgressSink`（包装 lambda）
+
+### 8.2 报告输出（`OptimizeReport` + `ReportIO` + `ReportSink`）
+
+**报告字段**：
+- `processedChunks`：已处理区块总数
+- `removedChunks`：已移除区块总数
+- `errors`：非致命错误列表（`path` + `kind` + `message`）
+
+**三种序列化格式**：
+| 格式 | 特点 |
+|------|------|
+| JSON | 完整结构，含所有错误详情 |
+| CSV | 第一行汇总统计，后续行错误详情 |
+| Text | 人类可读的纯文本格式 |
+
+**报告接收器**：`FileReportSink`（写入文件）、`NoopReportSink`（丢弃）
+
+### 8.3 日志接收器（`LoggerSink`）
+
+- `info()` → stdout
+- `warn()` / `error()` → stderr
+
+### 8.4 指标收集（`MetricsSink`）
+
+- `incProcessed(n)`、`incRemoved(n)`、`recordError(error)`
+- `NoopMetricsSink`（默认丢弃，保留扩展点）
+
+---
+
+## 九、文件系统抽象（`FileSystem`）
+
+### 9.1 接口方法（15 个）
+
+`isDirectory`、`isRegularFile`、`createTempDirectory`、`exists`、`list`、`walk`、`createDirectories`、`deleteIfExists`、`copy`、`write`、`read`、`size`、`deleteTreeWithRetry`、`toRealPath`
+
+### 9.2 `RealFileSystem`（生产用）
+
+- 包装 `java.nio.file.Files`
+- `deleteTreeWithRetry` 调用 `Cleaner.clearDosAttributes`（Windows 兼容）
+
+### 9.3 `MemoryFS`（测试用）
+
+- 基于 `ConcurrentHashMap<String, ByteArray>`，线程安全
+- `toRealPath()` 将内存数据物化到临时目录（供需要真实路径的 API）
+
+---
+
+## 十、错误处理体系（`Errors.kt`）
+
+自定义异常层次（全部继承自 `OptimizeException` → `RuntimeException`）：
+
+| 异常类 | 场景 |
+|--------|------|
+| `InputNotDirectoryException` | 输入路径不是目录 |
+| `OutputRequiredException` | 需要输出目录但未提供（非原地模式） |
+| `OutputNotEmptyException` | 输出目录非空且未设置 `--force` |
+| `OutputAccessDeniedException` | 输出目录无写入权限 |
+| `CompressionFailedException` | ZIP 打包失败 |
+| `InPlaceReplacementException` | 原地替换阶段 I/O 错误 |
+| `InvalidWorldStructureException` | 世界目录结构不符合预期 |
+| `ForceLoadedParseException` | 强制加载文件解析失败 |
+| `AggregateOptimizeException` | 收集多个 `OptimizeError` 统一上报 |
+
+非致命错误收集在 `OptimizeReport.errors` 中，不中断处理流程。
+
+---
+
+## 十一、CLI 入口（`Main.kt`）
+
+### 11.1 参数体系
+
+| 参数 | 类型 | 默认值 | 功能 |
+|------|------|--------|------|
+| `WORLD_DIR` | 位置参数（必填） | — | 世界目录 |
+| `OUTPUT_DIR` | 位置参数（可选） | — | 输出目录 |
+| `-t`/`--inhabited-time-seconds` | 选项 | 300 | 活跃时间阈值 |
+| `--remove-unknown` | 开关 | false | 移除未知压缩区块 |
+| `--progress-mode` | 枚举 | Region | Off/Global/Region |
+| `--in-place` | 开关 | false | 原地处理 |
+| `--zip-output` | 开关 | false | 输出打包为 ZIP |
+| `-f`/`--force` | 开关 | false | 强制覆盖 |
+| `--strict` | 开关 | false | 严格模式 |
+| `--report` | 开关 | false | 打印摘要报告 |
+| `--report-file` | 字符串 | null | 报告文件路径 |
+| `--report-format` | 枚举 | json | json/csv |
+| `--progress-interval` | 整数 | 1000 | 进度回调间隔（区块数） |
+| `--progress-interval-ms` | 整数 | 0 | 进度回调间隔（毫秒） |
+| `--parallelism` | 整数 | 1 | 维度并行数 |
+| `--copy-misc` | 布尔 | true | 复制杂项文件 |
+| `--dry-run` | 开关 | false | 预览模式 |
+
+### 11.2 进度显示
+
+- **Off**：不输出
+- **Region**（默认）：按区域文件粒度显示中文状态
+- **Global**：百分比进度 `[进度：X%(A/B)]`
+
+### 11.3 退出码
+
+- 0：成功
+- 1：strict 模式下出错，或任何 `OptimizeException`
+
+---
+
+## 十二、测试体系
+
+### 12.1 测试核心策略
+
+**可测试性设计**：`FileSystem` + `McaIOFactory` 抽象使全管道可在内存中运行。
+- `MemoryFS`（内存文件系统）
+- `MemoryMcaIOFactory` + `MemoryMcaWriter`（内存 MCA 读写）
+- `McaMemoryBuilder`（testFixtures，编程构建合成 MCA 数据）
+
+### 12.2 测试类型
+
+| 测试类 | 类型 | 覆盖场景 |
+|--------|------|----------|
+| `MemoryE2ETest` | 端到端 | 全管道：世界创建 → 优化 → 报告 |
+| `MemoryParallelE2ETest` | 端到端 | 并行模式全管道 |
+| `McaReaderTest` | 单元 | 文件/内存打开、条目解析、坐标提取 |
+| `McaWriterTest` | 单元 | 写入单/多区块、头部完整性 |
+| `RangePatternTest` | 单元 | 矩形匹配、坐标归一化 |
+| `NbtForceLoaderTest` | 单元 | 新版/旧版强制加载 NBT 解析 |
+| `Lz4InvalidTest` | 单元 | 损坏 LZ4 数据的容错 |
+| `OptimizerApiTest` | 单元 | API 入口组合 |
+| `OptimizerConfigParamTest` | 参数化 | 所有配置组合 |
+| `OptimizerInputValidationTest` | 单元 | 无效输入的错误处理 |
+| `OptimizerOutputModeTest` | 单元 | 4 种输出模式 |
+| `ForceLoadedListTest` | 功能 | 强制加载保留 |
+| `ForceLoadedOverrideThresholdTest` | 功能 | 强制加载覆盖阈值 |
+| `InhabitedThresholdTest` | 功能 | 阈值 300/0/-1 场景 |
+| `MemoryFSTest` | 单元 | MemoryFS 正确性 |
+| `McaMemoryParamTest` | 参数化 | MCA 读写多样化组合 |
+| `IoTimingTest` | 性能 | I/O 行为验证 |
+| `LoggerSinkTest` | 单元 | 日志输出到 stdout/stderr |
+| `ReportIOTest` | 单元 | JSON/CSV/Text 序列化 |
+| `MainCliCopyMiscTest` | CLI | `--copy-misc` 处理 |
+| `MainCliCopyMiscWindowsTest` | CLI | Windows 杂项复制 |
+| `MainCliReportTest` | CLI | 报告生成 |
+| `MainCliStrictExitCodeTest` | CLI | 严格模式退出码 |
+
+### 12.3 辅助工具
+
+- **`FailingFileSystem`**：模拟 I/O 错误，测试失败恢复
+- **`TestHelper`**：测试工具函数
+- **`TestPaths`**：定位基于磁盘的测试夹具目录
+- **`TestTmp`**：临时目录管理
+- **`PrintTestPaths`**：Gradle 任务，打印测试资源路径（CI 调试）
+
+---
+
+## 十三、CI/CD 流水线
+
+| 工作流 | 触发条件 | 内容 |
+|--------|----------|------|
+| `test-matrix.yml` | push / PR | 3 JDK × 3 OS 矩阵测试 + Kover 覆盖率 |
+| `release-lib.yml` | tag `v*` / manual | 签名并发布库到 Maven Central Portal |
+| `release-app.yml` | tag / manual | 构建 Shadow JAR + GitHub Release |
+| `dependabot.yml` | 每日 | 自动检查依赖更新 |
+
+---
+
+## 十四、构建配置
+
+| 模块 | 特性 |
+|------|------|
+| 根项目 | Kotlin 2.4.0、Gradle 9.5.1、JDK 17-29 校验 |
+| `core` | 库发布、签名、Dokka（Javadoc JAR）、test-fixtures |
+| `app` | Shadow JAR（fat JAR）、picocli CLI |
+
+### 依赖
+
+- **核心运行时**：Kotlin stdlib、`org.lz4:lz4-java:1.8.0`
+- **并发**：`kotlinx-coroutines-core:1.11.0`
+- **CLI**：`info.picocli:picocli:4.7.7`
+- **测试**：JUnit Jupiter 6.1.0 + Platform Launcher
+
+---
+
+## 十五、关键架构决策总结
+
+1. **抽象可测试性**：`FileSystem` + `McaIOFactory` 双抽象层，全管道可在内存测试
+2. **惰性 MCA 写入**：仅在有保留区块时创建 writer，避免空文件
+3. **字节级 InhabitedTime 扫描**：不解析完整 NBT，只搜 `TAG_Long` + 名称匹配合成模式，直接读 8 字节值
+4. **严格 `>` 语义**：`InhabitedTime == threshold` 的区块被移除（保留），`threshold=0` 移除非活跃区块
+5. **错误容错**：非致命错收集在报告中不中断，`strict` 模式升级为退出码 1
+6. **双节流进度**：支持按区块数和按毫秒两种进度汇报频率
+7. **MCA 读写缓冲**：8KiB 对齐读缓冲减少系统调用
+8. **26.1+ 兼容**：递归维度发现 + 新版 `chunk_tickets.dat` 优先探测
+9. **模式链而非单一策略**：`ListPattern` + `InhabitedTimePattern` 链式评估
