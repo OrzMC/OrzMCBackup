@@ -45,11 +45,11 @@ Kotlin/Gradle 多模块工程，用于优化 Minecraft Java 世界。扫描 regi
 
 ```
 CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
-  → 发现维度（包含 region/ 目录的子目录）
+  → 发现维度（包含 region/ 目录的子目录，递归支持 26.1+ 的 dimensions/ 结构）
   → 统计所有 MCA 文件中的总区块数
   → 按维度逐个处理（支持串行或线程池并行）：
-      解析 chunks.dat 获取强制加载坐标
-      对每个入口评估 ChunkPattern（ListPattern + InhabitedTimePattern）
+      解析 data/minecraft/chunk_tickets.dat 或 data/chunks.dat 获取强制加载坐标（自动探测）
+      对每个入口评估 ChunkPattern（ListPattern + InhabitedTimePattern 等）
       匹配 → 重写 region + entities + POI .mca
   → [可选] 复制杂项文件、ZIP 打包输出、或原地替换
   → 输出 OptimizeReport
@@ -64,7 +64,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
   - `OptimizerConfig.kt` — 所有配置数据类（`OptimizerRequest`、`FilterOptions`、`OutputOptions`、`ProgressOptions`、`RuntimeOptions`、`Hooks`、`IOOptions`）+ Builder 模式
   - `FileSystem` — 抽象，提供 `RealFileSystem`（java.nio）和 `MemoryFS`（基于 ConcurrentHashMap，用于测试）
   - `McaIOFactory` — MCA 读写器工厂，提供 `DefaultMcaIOFactory`（真实文件）和 `MemoryMcaIOFactory`（内存）
-  - `ForceLoad` / `NbtForceLoader` — `chunks.dat` 解析器（GZip NBT，支持旧版 `Forced` LongArray 和新版 `tickets[].chunk_pos`）
+  - `ForceLoad` / `NbtForceLoader` — 强制加载区块解析器，按优先级探测 `data/minecraft/chunk_tickets.dat`（26.1+）→ `data/chunks.dat`（旧版）；GZip NBT 解析，支持旧版 `Forced` LongArray 和新版 `tickets[].chunk_pos`
   - `Compressor` — ZIP 压缩输出
   - `Cleaner` — 文件清理，含 Windows DOS 属性处理
   - `ProgressSink` / `ProgressEvent` — 进度报告管道路
@@ -80,8 +80,9 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
   - `RandomAccess` — 抽象，提供 `RafAccess`、`BufferedRafAccess`（8K 缓冲）、`MemoryAccess`
 
 - **`patterns/`** — 实现 `ChunkPattern` 接口的区块保留策略
-  - `InhabitedTimePattern` — 字节级扫描 `InhabitedTime` NBT long 字段（无需完整 NBT 解析）
+  - `InhabitedTimePattern` — 字节级扫描 `InhabitedTime` NBT long 字段（无需完整 NBT 解析）；使用 `>` 语义，`threshold=0` 时移除未曾访问的区块
   - `ListPattern` — 基于坐标的保留列表（强制加载区块）
+  - `RangePattern` — 矩形区域保留（自动坐标归一化）
 
 - **`app`（CLI）** — 基于 picocli 的单一 `Main` 类，将所有 CLI 选项映射到 `OptimizerRequest`
 
@@ -92,6 +93,8 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 3. **进度报告：** 两种限流模式——按区块数（`progressInterval`）或按墙上时钟时间（`progressIntervalMs`）。
 4. **可扩展性：** `parallelism` 控制维度级线程池。`DimensionProcessor` 也支持区域级并行。
 5. **快速 InhabitedTime 检查：** 使用字节级扫描查找 NBT 标签，而非完整的 NBT 反序列化。
+6. **惰性 MCA 写入：** 仅当至少有一个区块被保留时才创建输出 writer，避免写入空 MCA 文件。
+7. **26.1+ 世界格式兼容：** ForceLoad 按优先级探测 `chunk_tickets.dat` → `chunks.dat`；维度发现递归支持 `dimensions/` 嵌套结构。
 
 ### 测试
 
