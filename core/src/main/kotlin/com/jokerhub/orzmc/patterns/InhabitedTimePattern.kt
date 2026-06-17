@@ -11,7 +11,13 @@ import java.nio.ByteOrder
  * `InhabitedTime` long field without a full NBT parse. External-compressed
  * and unparseable chunks are handled according to [removeUnknown].
  *
- * @param threshold minimum InhabitedTime in game ticks (20 ticks = 1 second)
+ * A chunk is kept when its `InhabitedTime` is **strictly greater than**
+ * [threshold] (>, not >=). This means setting [threshold] to 0 removes chunks
+ * that were generated but never visited. This matches the semantics of the
+ * original Aternos/Thanos implementation.
+ *
+ * @param threshold minimum InhabitedTime in game ticks (20 ticks = 1 second);
+ *   chunks with `InhabitedTime > threshold` are kept
  * @param removeUnknown if true, external/unparseable chunks are removed; otherwise they are kept
  */
 class InhabitedTimePattern(
@@ -24,7 +30,7 @@ class InhabitedTimePattern(
         val data = entry.allDataUncompressed()
         if (data.isEmpty()) return !removeUnknown
         val t = findInhabitedFast(data)
-        return t?.let { it >= threshold } ?: (!removeUnknown)
+        return t?.let { it > threshold } ?: (!removeUnknown)
     }
 
     companion object {

@@ -2,6 +2,7 @@ package com.jokerhub.orzmc
 
 import com.jokerhub.orzmc.util.CompressionKind
 import com.jokerhub.orzmc.util.McaMemoryBuilder
+import com.jokerhub.orzmc.util.McaMemoryBuilder.MemChunk
 import com.jokerhub.orzmc.world.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -58,6 +59,34 @@ class MemoryE2ETest {
         // Should NOT have written output files
         assertFalse(fs.exists(out.resolve("region").resolve("r.0.0.mca")),
             "dry-run should not write output files")
+    }
+
+    @Test
+    fun `all chunks removed does not create empty MCA output`() {
+        val fs = MemoryFS()
+        val world = java.nio.file.Paths.get("/mem/empty-world")
+        fs.createDirectories(world)
+        fs.createDirectories(world.resolve("region"))
+        // MCA with 2 chunks, both with InhabitedTime=0 (unvisited)
+        val data = McaMemoryBuilder.buildMca(listOf(
+            MemChunk(0, 0L, CompressionKind.RAW),
+            MemChunk(1, 0L, CompressionKind.RAW)
+        ))
+        fs.write(world.resolve("region").resolve("r.0.0.mca"), data)
+        val out = java.nio.file.Paths.get("/mem/empty-out")
+        val request = OptimizerRequest(
+            input = world,
+            output = out,
+            // threshold > 0 means InhabitedTime == 0 chunks are removed
+            filter = FilterOptions(inhabitedThresholdSeconds = 1, removeUnknown = false),
+            io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
+        )
+        val report = Optimizer.run(request)
+        assertEquals(2, report.processedChunks)
+        assertEquals(2, report.removedChunks)
+        // Output MCA file should NOT exist when all chunks are removed
+        assertFalse(fs.exists(out.resolve("region").resolve("r.0.0.mca")),
+            "output MCA should not be created when all chunks are removed")
     }
 
     @Test

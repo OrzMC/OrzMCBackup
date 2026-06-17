@@ -134,7 +134,11 @@ internal object DimensionProcessor {
             onError(rf, ERR_MCA, "Failed to read MCA file: ${e.message}")
             return RegionResult(0, 0)
         }
-        val cw = if (!dryRun) ioFactory.createWriter(fs, targetDim.resolve("region").resolve(name)) else null
+        // Defer writer creation until after we know there are entries to keep.
+        // This avoids writing empty MCA files when all chunks are removed.
+        var cw: McaWriterLike? = null
+        var ew: McaWriterLike? = null
+        var pw: McaWriterLike? = null
         val er: McaReaderLike? = try {
             if (fs.isRegularFile(efile) && McaUtils.isValidMca(fs, efile)) {
                 ioFactory.openReader(fs, efile)
@@ -151,8 +155,6 @@ internal object DimensionProcessor {
             onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
             null
         }
-        val ew = if (!dryRun && er != null) ioFactory.createWriter(fs, targetDim.resolve("entities").resolve(name)) else null
-        val pw = if (!dryRun && pr != null) ioFactory.createWriter(fs, targetDim.resolve("poi").resolve(name)) else null
         try {
             val entries = try { cr.entries() } catch (e: Exception) {
                 onError(rf, ERR_ENTRIES, "Failed to read chunk entries: ${e.message}")
@@ -168,6 +170,12 @@ internal object DimensionProcessor {
                     }
                 }
                 if (keep) {
+                    // Lazily create writers only when at least one chunk is kept.
+                    if (cw == null && !dryRun) {
+                        cw = ioFactory.createWriter(fs, targetDim.resolve("region").resolve(name))
+                        if (er != null) ew = ioFactory.createWriter(fs, targetDim.resolve("entities").resolve(name))
+                        if (pr != null) pw = ioFactory.createWriter(fs, targetDim.resolve("poi").resolve(name))
+                    }
                     try { cw?.writeEntry(entry) } catch (e: Exception) { onError(rf, ERR_WRITE, "Failed to write entry: ${e.message}") }
                     try {
                         val eentry = er?.get(entry.regionIndex())

@@ -207,6 +207,54 @@ class NbtForceLoaderTest {
     }
 
     @Test
+    fun `parse chunk_tickets_dat with tickets format`() {
+        val data = buildChunksDat {
+            val tagString: Byte = 0x08
+            val tagIntArray: Byte = 0x0B
+            val tagCompound: Byte = 0x0A
+            val tagList: Byte = 0x09
+            val tagEnd: Byte = 0x00
+
+            writeByte(tagCompound.toInt()) // TAG_Compound (root)
+            writeNbtString("")
+            writeByte(tagCompound.toInt()) // TAG_Compound "data"
+            writeNbtString("data")
+            writeByte(tagList.toInt()) // TAG_List "tickets"
+            writeNbtString("tickets")
+            writeByte(tagCompound.toInt()) // element type
+            writeInt(3) // 3 tickets
+
+            // Ticket 1: forced (100, 200)
+            writeCompoundEntries(
+                "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(100); writeInt(200) })
+            )
+            // Ticket 2: not forced (should be skipped)
+            writeCompoundEntries(
+                "type" to (tagString to { writeNbtString("minecraft:other") }),
+                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(300); writeInt(400) })
+            )
+            // Ticket 3: forced (500, 600)
+            writeCompoundEntries(
+                "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(500); writeInt(600) })
+            )
+
+            writeByte(tagEnd.toInt()) // TAG_End (data)
+            writeByte(tagEnd.toInt()) // TAG_End (root)
+        }
+
+        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunk_tickets", ".dat").apply {
+            writeBytes(data)
+            deleteOnExit()
+        })
+
+        assertTrue(result.contains(100 to 200), "should contain forced ticket (100, 200)")
+        assertTrue(result.contains(500 to 600), "should contain forced ticket (500, 600)")
+        assertEquals(2, result.size, "should have exactly 2 forced entries, skipping non-forced ticket")
+    }
+
+    @Test
     fun `oversized list is rejected with custom limit`() {
         val maxListLength = 5
         val data = buildChunksDat {
