@@ -1,0 +1,38 @@
+# detekt 静态分析配置文件
+# 基于默认配置构建（buildUponDefaultConfig: true），覆盖部分规则
+
+style:
+  # 允许魔术数字（Minecraft 领域常见）
+  MagicNumber:
+    active: false
+  # 允许在测试代码中使用未使用参数
+  UnusedPrivateMember:
+    active: true
+    excludes: ['**/test/**', '**/testFixtures/**']
+
+complexity:
+  # 允许较长的方法（Minecraft MCA 解析方法较长）
+  LongMethod:
+    active: true
+    threshold: 80
+  # 允许较多的类方法
+  TooManyFunctions:
+    active: true
+    thresholdInFiles: 20
+    thresholdInClasses: 20
+
+exceptions:
+  TooGenericExceptionCaught:
+    active: false
+  # 允许 catch Exception（顶级 CLI 入口）
+  IllegalVariableSource:
+    active: false
+
+comments:
+  # 允许缺少注释
+  UndocumentedPublicClass:
+    active: false
+  UndocumentedPublicFunction:
+    active: false
+  UndocumentedPublicProperty:
+    active: false

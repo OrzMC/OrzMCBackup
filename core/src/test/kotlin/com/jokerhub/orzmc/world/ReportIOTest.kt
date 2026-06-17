@@ -1,12 +1,10 @@
 package com.jokerhub.orzmc.world
 
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class ReportIOTest {
-
     @Test
     fun `toJson with no errors`() {
         val report = OptimizeReport(processedChunks = 100, removedChunks = 25, errors = emptyList())
@@ -20,14 +18,16 @@ class ReportIOTest {
 
     @Test
     fun `toJson with errors`() {
-        val report = OptimizeReport(
-            processedChunks = 50,
-            removedChunks = 10,
-            errors = listOf(
-                OptimizeError("/path/file.mca", "MCA", "corrupted"),
-                OptimizeError("/path/other.mca", "Write", "write failed")
+        val report =
+            OptimizeReport(
+                processedChunks = 50,
+                removedChunks = 10,
+                errors =
+                    listOf(
+                        OptimizeError("/path/file.mca", "MCA", "corrupted"),
+                        OptimizeError("/path/other.mca", "Write", "write failed"),
+                    ),
             )
-        )
         val json = ReportIO.toJson(report)
         assertTrue(json.contains("\"kind\":\"MCA\""))
         assertTrue(json.contains("\"kind\":\"Write\""))
@@ -37,13 +37,15 @@ class ReportIOTest {
 
     @Test
     fun `toJson escapes special characters`() {
-        val report = OptimizeReport(
-            processedChunks = 1,
-            removedChunks = 0,
-            errors = listOf(
-                OptimizeError("path\"with\"quotes", "kind\\with\\backslash", "msg")
+        val report =
+            OptimizeReport(
+                processedChunks = 1,
+                removedChunks = 0,
+                errors =
+                    listOf(
+                        OptimizeError("path\"with\"quotes", "kind\\with\\backslash", "msg"),
+                    ),
             )
-        )
         val json = ReportIO.toJson(report)
         // Verify the value portion has backslash-escaped quotes: path\"with\"quotes
         val valueStart = json.indexOf("\"path\":\"") + "\"path\":\"".length
@@ -66,14 +68,16 @@ class ReportIOTest {
 
     @Test
     fun `toCsv with errors`() {
-        val report = OptimizeReport(
-            processedChunks = 10,
-            removedChunks = 5,
-            errors = listOf(
-                OptimizeError("/path/a.mca", "ERR", "msg1"),
-                OptimizeError("/path/b.mca", "ERR", "msg2")
+        val report =
+            OptimizeReport(
+                processedChunks = 10,
+                removedChunks = 5,
+                errors =
+                    listOf(
+                        OptimizeError("/path/a.mca", "ERR", "msg1"),
+                        OptimizeError("/path/b.mca", "ERR", "msg2"),
+                    ),
             )
-        )
         val csv = ReportIO.toCsv(report)
         val lines = csv.trimEnd().lines()
         assertEquals(5, lines.size) // header1 + data1 + header2 + 2 error rows
@@ -84,13 +88,15 @@ class ReportIOTest {
 
     @Test
     fun `toText renders correctly`() {
-        val report = OptimizeReport(
-            processedChunks = 30,
-            removedChunks = 15,
-            errors = listOf(
-                OptimizeError("/path/e.mca", "ERR", "something went wrong")
+        val report =
+            OptimizeReport(
+                processedChunks = 30,
+                removedChunks = 15,
+                errors =
+                    listOf(
+                        OptimizeError("/path/e.mca", "ERR", "something went wrong"),
+                    ),
             )
-        )
         val text = ReportIO.toText(report)
         assertTrue(text.contains("processed=30"))
         assertTrue(text.contains("removed=15"))
@@ -103,9 +109,10 @@ class ReportIOTest {
     @Test
     fun `write method produces valid json file`() {
         val report = OptimizeReport(processedChunks = 5, removedChunks = 2, errors = emptyList())
-        val tmpFile = java.nio.file.Files.createTempFile("report", ".json").also {
-            it.toFile().deleteOnExit()
-        }
+        val tmpFile =
+            java.nio.file.Files.createTempFile("report", ".json").also {
+                it.toFile().deleteOnExit()
+            }
         ReportIO.write(report, tmpFile, "json")
         val content = String(java.nio.file.Files.readAllBytes(tmpFile), Charsets.UTF_8)
         assertTrue(content.contains("\"processedChunks\":5"))
@@ -114,9 +121,10 @@ class ReportIOTest {
     @Test
     fun `write method produces valid csv file`() {
         val report = OptimizeReport(processedChunks = 5, removedChunks = 2, errors = emptyList())
-        val tmpFile = java.nio.file.Files.createTempFile("report", ".csv").also {
-            it.toFile().deleteOnExit()
-        }
+        val tmpFile =
+            java.nio.file.Files.createTempFile("report", ".csv").also {
+                it.toFile().deleteOnExit()
+            }
         ReportIO.write(report, tmpFile, "csv")
         val content = String(java.nio.file.Files.readAllBytes(tmpFile), Charsets.UTF_8)
         assertTrue(content.contains("5,2,0"))

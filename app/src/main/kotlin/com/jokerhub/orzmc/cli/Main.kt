@@ -10,10 +10,11 @@ import java.util.concurrent.Callable
     name = "backup",
     description = [
         "Optimize Minecraft Java worlds",
-        "Scan MCA region files and remove unused chunks. Keep chunks by InhabitedTime threshold and force-loaded tickets."
+        "Scan MCA region files and remove unused chunks. " +
+            "Keep chunks by InhabitedTime threshold and force-loaded tickets.",
     ],
     mixinStandardHelpOptions = true,
-    versionProvider = BuildVersionProvider::class
+    versionProvider = BuildVersionProvider::class,
 )
 class Main : Callable<Int> {
     var logger: LoggerSink = ConsoleLoggerSink()
@@ -25,56 +26,56 @@ class Main : Callable<Int> {
         index = "1",
         arity = "0..1",
         description = ["Output directory (must be empty; optional)"],
-        paramLabel = "OUTPUT_DIR"
+        paramLabel = "OUTPUT_DIR",
     )
     var output: Path? = null
 
     @Option(
         names = ["-t", "--inhabited-time-seconds"],
         description = ["InhabitedTime threshold in seconds (1s = 20 ticks)"],
-        defaultValue = "300"
+        defaultValue = "300",
     )
     var inhabitedTimeSeconds: Long = 300
 
     @Option(
         names = ["--remove-unknown"],
         description = ["Treat unknown/external-compressed chunks as removable"],
-        defaultValue = "false"
+        defaultValue = "false",
     )
     var removeUnknown: Boolean = false
 
     @Option(
         names = ["--progress-mode"],
         description = ["Progress display: Off | Global | Region"],
-        defaultValue = "Region"
+        defaultValue = "Region",
     )
     lateinit var progressMode: ProgressMode
 
     @Option(
         names = ["--in-place"],
         description = ["Process in-place: ignore OUTPUT_DIR and replace WORLD_DIR"],
-        defaultValue = "false"
+        defaultValue = "false",
     )
     var inPlace: Boolean = false
 
     @Option(
         names = ["--zip-output"],
         description = ["Zip OUTPUT_DIR to timestamped archive (YYYYMMddHHmmss.zip) and remove it"],
-        defaultValue = "false"
+        defaultValue = "false",
     )
     var zipOutput: Boolean = false
 
     @Option(
         names = ["-f", "--force"],
         description = ["Force overwrite OUTPUT_DIR if it exists (no prompt)"],
-        defaultValue = "false"
+        defaultValue = "false",
     )
     var force: Boolean = false
 
     @Option(
         names = ["--strict"],
         description = ["Strict mode: fail on damaged MCA or parse errors"],
-        defaultValue = "false"
+        defaultValue = "false",
     )
     var strict: Boolean = false
 
@@ -90,107 +91,128 @@ class Main : Callable<Int> {
     @Option(
         names = ["--progress-interval"],
         description = ["Progress callback interval (chunks)"],
-        defaultValue = "1000"
+        defaultValue = "1000",
     )
     var progressInterval: Long = 1000
 
     @Option(
         names = ["--progress-interval-ms"],
         description = ["Progress callback interval (milliseconds)"],
-        defaultValue = "0"
+        defaultValue = "0",
     )
     var progressIntervalMs: Long = 0
 
     @Option(names = ["--parallelism"], description = ["Parallel dimension processing threads"], defaultValue = "1")
     var parallelism: Int = 1
-    @Option(names = ["--copy-misc"], description = ["Copy non-region/entities/poi files and folders in each dimension"], defaultValue = "true", negatable = true)
+
+    @Option(
+        names = ["--copy-misc"],
+        description = ["Copy non-region/entities/poi files and folders in each dimension"],
+        defaultValue = "true",
+        negatable = true,
+    )
     var copyMisc: Boolean = true
-    @Option(names = ["--dry-run"], description = ["Preview mode: scan and report without writing any output"], defaultValue = "false")
+
+    @Option(
+        names = ["--dry-run"],
+        description = ["Preview mode: scan and report without writing any output"],
+        defaultValue = "false",
+    )
     var dryRun: Boolean = false
 
     override fun call(): Int {
         return try {
             val reportSink = reportFile?.let { FileReportSink(it, reportFormat) }
-            val progressPrinter: ((ProgressEvent) -> Unit)? = when (progressMode) {
-                ProgressMode.Off -> null
-                else -> { e ->
-                    when (e.stage) {
-                        ProgressStage.Init -> logger.info("开始")
-                        ProgressStage.Discover -> {
-                            val t = e.total ?: 0
-                            logger.info("扫描与统计区块，总数：$t")
-                        }
-                        ProgressStage.DimensionStart -> logger.info("处理维度：${e.path}")
-                        ProgressStage.RegionStart -> if (progressMode == ProgressMode.Region) logger.info("处理区块文件：${e.path}")
-                        ProgressStage.ChunkProgress -> {
-                            val cur = e.current ?: 0
-                            val tot = e.total ?: 0
-                            if (progressMode == ProgressMode.Global) {
-                                val percent = if (tot > 0) (cur * 100) / tot else 0
-                                logger.info("进度：$percent%（$cur/$tot）")
+            val progressPrinter: ((ProgressEvent) -> Unit)? =
+                when (progressMode) {
+                    ProgressMode.Off -> null
+                    else -> { e ->
+                        when (e.stage) {
+                            ProgressStage.Init -> logger.info("开始")
+                            ProgressStage.Discover -> {
+                                val t = e.total ?: 0
+                                logger.info("扫描与统计区块，总数：$t")
                             }
-                        }
-                        ProgressStage.Finalize -> logger.info("完成写入：${e.path}")
-                        ProgressStage.CopyMisc -> logger.info("复制杂项文件")
-                        ProgressStage.CopyMiscProgress -> {
-                            val cur = e.current ?: 0
-                            val tot = e.total ?: 0
-                            if (progressMode == ProgressMode.Global) {
-                                val percent = if (tot > 0) (cur * 100) / tot else 0
-                                logger.info("进度：$percent%（$cur/$tot）")
+                            ProgressStage.DimensionStart -> logger.info("处理维度：${e.path}")
+                            ProgressStage.RegionStart ->
+                                if (progressMode == ProgressMode.Region) {
+                                    logger.info(
+                                        "处理区块文件：${e.path}",
+                                    )
+                                }
+                            ProgressStage.ChunkProgress -> {
+                                val cur = e.current ?: 0
+                                val tot = e.total ?: 0
+                                if (progressMode == ProgressMode.Global) {
+                                    val percent = if (tot > 0) (cur * 100) / tot else 0
+                                    logger.info("进度：$percent%（$cur/$tot）")
+                                }
                             }
-                        }
-                        ProgressStage.Compress -> {
-                            logger.info("压缩输出目录")
-                            val cur = e.current ?: 0
-                            val tot = e.total ?: 0
-                            if (progressMode == ProgressMode.Global) {
-                                val percent = if (tot > 0) (cur * 100) / tot else 0
-                                logger.info("进度：$percent%（$cur/$tot）")
+                            ProgressStage.Finalize -> logger.info("完成写入：${e.path}")
+                            ProgressStage.CopyMisc -> logger.info("复制杂项文件")
+                            ProgressStage.CopyMiscProgress -> {
+                                val cur = e.current ?: 0
+                                val tot = e.total ?: 0
+                                if (progressMode == ProgressMode.Global) {
+                                    val percent = if (tot > 0) (cur * 100) / tot else 0
+                                    logger.info("进度：$percent%（$cur/$tot）")
+                                }
                             }
-                        }
-                        ProgressStage.Cleanup -> {
-                            logger.info("清理输出目录")
-                            val cur = e.current ?: 0
-                            val tot = e.total ?: 0
-                            if (progressMode == ProgressMode.Global) {
-                                val percent = if (tot > 0) (cur * 100) / tot else 0
-                                logger.info("进度：$percent%（$cur/$tot）")
+                            ProgressStage.Compress -> {
+                                logger.info("压缩输出目录")
+                                val cur = e.current ?: 0
+                                val tot = e.total ?: 0
+                                if (progressMode == ProgressMode.Global) {
+                                    val percent = if (tot > 0) (cur * 100) / tot else 0
+                                    logger.info("进度：$percent%（$cur/$tot）")
+                                }
                             }
-                        }
-                        ProgressStage.DimensionEnd -> logger.info("维度完成：${e.path}")
-                        ProgressStage.Done -> {
-                            val cur = e.current ?: 0
-                            val tot = e.total ?: 0
-                            logger.info("完成：$cur/$tot")
+                            ProgressStage.Cleanup -> {
+                                logger.info("清理输出目录")
+                                val cur = e.current ?: 0
+                                val tot = e.total ?: 0
+                                if (progressMode == ProgressMode.Global) {
+                                    val percent = if (tot > 0) (cur * 100) / tot else 0
+                                    logger.info("进度：$percent%（$cur/$tot）")
+                                }
+                            }
+                            ProgressStage.DimensionEnd -> logger.info("维度完成：${e.path}")
+                            ProgressStage.Done -> {
+                                val cur = e.current ?: 0
+                                val tot = e.total ?: 0
+                                logger.info("完成：$cur/$tot")
+                            }
                         }
                     }
                 }
-            }
             val progressSink = progressPrinter?.let { CallbackProgressSink(it) } ?: NoopProgressSink
-            val request = OptimizerRequest(
-                input = input,
-                output = output,
-                filter = FilterOptions(
-                    inhabitedThresholdSeconds = inhabitedTimeSeconds,
-                    removeUnknown = removeUnknown,
-                    strict = strict
-                ),
-                outputOptions = OutputOptions(
-                    inPlace = inPlace,
-                    zipOutput = zipOutput,
-                    force = force,
-                    copyMisc = copyMisc,
-                    dryRun = dryRun
-                ),
-                progress = ProgressOptions(
-                    interval = progressInterval,
-                    intervalMs = progressIntervalMs,
-                    sink = progressSink
-                ),
-                runtime = RuntimeOptions(parallelism = parallelism),
-                hooks = Hooks(reportSink = reportSink)
-            )
+            val request =
+                OptimizerRequest(
+                    input = input,
+                    output = output,
+                    filter =
+                        FilterOptions(
+                            inhabitedThresholdSeconds = inhabitedTimeSeconds,
+                            removeUnknown = removeUnknown,
+                            strict = strict,
+                        ),
+                    outputOptions =
+                        OutputOptions(
+                            inPlace = inPlace,
+                            zipOutput = zipOutput,
+                            force = force,
+                            copyMisc = copyMisc,
+                            dryRun = dryRun,
+                        ),
+                    progress =
+                        ProgressOptions(
+                            interval = progressInterval,
+                            intervalMs = progressIntervalMs,
+                            sink = progressSink,
+                        ),
+                    runtime = RuntimeOptions(parallelism = parallelism),
+                    hooks = Hooks(reportSink = reportSink),
+                )
             val r = Optimizer.run(request)
             if (report) logger.info(ReportIO.toText(r))
             reportFile?.let { path -> logger.info("报告已写入：$path") }

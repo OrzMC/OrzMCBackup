@@ -24,7 +24,6 @@ class InhabitedTimePattern(
     private val threshold: Long,
     private val removeUnknown: Boolean,
 ) : ChunkPattern {
-
     override fun matches(entry: McaEntry): Boolean {
         if (entry.isExternal()) return !removeUnknown
         val data = entry.allDataUncompressed()
@@ -35,6 +34,7 @@ class InhabitedTimePattern(
 
     companion object {
         private const val LONG_TAG: Byte = 4
+
         private fun findInhabitedFast(data: ByteArray): Long? {
             val name = "InhabitedTime".toByteArray()
             val prefix = ByteArray(1 + 2 + name.size)
@@ -47,7 +47,10 @@ class InhabitedTimePattern(
             while (i + plen + 8 <= data.size) {
                 var match = true
                 for (j in 0 until plen) {
-                    if (data[i + j] != prefix[j]) { match = false; break }
+                    if (data[i + j] != prefix[j]) {
+                        match = false
+                        break
+                    }
                 }
                 if (match) {
                     val v = ByteBuffer.wrap(data, i + plen, 8).order(ByteOrder.BIG_ENDIAN).long

@@ -14,7 +14,7 @@ interface ReportSink {
  */
 class FileReportSink(
     private val path: Path,
-    private val format: String = "json"
+    private val format: String = "json",
 ) : ReportSink {
     override fun write(report: OptimizeReport) {
         ReportIO.write(report, path, format)

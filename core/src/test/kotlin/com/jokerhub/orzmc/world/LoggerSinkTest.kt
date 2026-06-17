@@ -10,41 +10,46 @@ class LoggerSinkTest {
 
     @Test
     fun `info writes to stdout`() {
-        val out = captureStdout {
-            sink.info("hello info")
-        }
+        val out =
+            captureStdout {
+                sink.info("hello info")
+            }
         assertTrue(out.contains("hello info"), "info should write to stdout")
     }
 
     @Test
     fun `warn writes to stderr`() {
-        val err = captureStderr {
-            sink.warn("hello warn")
-        }
+        val err =
+            captureStderr {
+                sink.warn("hello warn")
+            }
         assertTrue(err.contains("hello warn"), "warn should write to stderr")
     }
 
     @Test
     fun `error writes to stderr`() {
-        val err = captureStderr {
-            sink.error("hello error")
-        }
+        val err =
+            captureStderr {
+                sink.error("hello error")
+            }
         assertTrue(err.contains("hello error"), "error should write to stderr")
     }
 
     @Test
     fun `info with empty message works`() {
-        val out = captureStdout {
-            sink.info("")
-        }
+        val out =
+            captureStdout {
+                sink.info("")
+            }
         assertTrue(out.contains("\n") || out == "", "empty info should still produce output")
     }
 
     @Test
     fun `warn with multiline message`() {
-        val err = captureStderr {
-            sink.warn("line1\nline2\nline3")
-        }
+        val err =
+            captureStderr {
+                sink.warn("line1\nline2\nline3")
+            }
         assertTrue(err.contains("line1"), "warn should write first line")
         assertTrue(err.contains("line2"), "warn should write second line")
         assertTrue(err.contains("line3"), "warn should write third line")

@@ -1,10 +1,10 @@
 package com.jokerhub.orzmc
 
+import com.jokerhub.orzmc.mca.McaReader
 import com.jokerhub.orzmc.util.CompressionKind
 import com.jokerhub.orzmc.util.McaMemoryBuilder
 import com.jokerhub.orzmc.util.TestTmp
 import com.jokerhub.orzmc.world.*
-import com.jokerhub.orzmc.mca.McaReader
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -25,20 +25,22 @@ class OptimizerOutputModeTest {
 
     @Test
     fun `zipOutput creates zip and removes output directory`() {
-        val input = createWorldWithEntries(
-            listOf(McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW))
-        )
+        val input =
+            createWorldWithEntries(
+                listOf(McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW)),
+            )
         val out = TestTmp.createTempDirectory("optimizer-out-zip-")
         val parent = out.parent
         val before = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
-        val report = Optimizer.run(
-            OptimizerRequest(
-                input = input,
-                output = out,
-                filter = FilterOptions(inhabitedThresholdSeconds = 0),
-                outputOptions = OutputOptions(zipOutput = true, force = true)
+        val report =
+            Optimizer.run(
+                OptimizerRequest(
+                    input = input,
+                    output = out,
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                    outputOptions = OutputOptions(zipOutput = true, force = true),
+                ),
             )
-        )
         val after = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
         val created = after.filter { p -> before.none { it.toString() == p.toString() } }
         assertEquals(1, report.processedChunks)
@@ -50,20 +52,22 @@ class OptimizerOutputModeTest {
 
     @Test
     fun `inPlace replaces input with filtered output`() {
-        val input = createWorldWithEntries(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 0, inhabited = 0, kind = CompressionKind.RAW),
-                McaMemoryBuilder.MemChunk(index = 1, inhabited = 100000, kind = CompressionKind.RAW)
+        val input =
+            createWorldWithEntries(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 0, inhabited = 0, kind = CompressionKind.RAW),
+                    McaMemoryBuilder.MemChunk(index = 1, inhabited = 100000, kind = CompressionKind.RAW),
+                ),
             )
-        )
-        val report = Optimizer.run(
-            OptimizerRequest(
-                input = input,
-                output = null,
-                filter = FilterOptions(inhabitedThresholdSeconds = 1000),
-                outputOptions = OutputOptions(inPlace = true)
+        val report =
+            Optimizer.run(
+                OptimizerRequest(
+                    input = input,
+                    output = null,
+                    filter = FilterOptions(inhabitedThresholdSeconds = 1000),
+                    outputOptions = OutputOptions(inPlace = true),
+                ),
             )
-        )
         val region = input.resolve("region").resolve("r.0.0.mca")
         val count = McaReader.open(region.toString()).use { it.entries().size }
         assertEquals(2, report.processedChunks)
@@ -74,12 +78,13 @@ class OptimizerOutputModeTest {
 
     @Test
     fun `zipOutput contains valid mca files`() {
-        val input = createWorldWithEntries(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW),
-                McaMemoryBuilder.MemChunk(index = 1, inhabited = 1000, kind = CompressionKind.RAW)
+        val input =
+            createWorldWithEntries(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW),
+                    McaMemoryBuilder.MemChunk(index = 1, inhabited = 1000, kind = CompressionKind.RAW),
+                ),
             )
-        )
         val out = TestTmp.createTempDirectory("optimizer-out-zip-verify-")
         val parent = out.parent
         val before = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
@@ -88,8 +93,8 @@ class OptimizerOutputModeTest {
                 input = input,
                 output = out,
                 filter = FilterOptions(inhabitedThresholdSeconds = 0),
-                outputOptions = OutputOptions(zipOutput = true, force = true)
-            )
+                outputOptions = OutputOptions(zipOutput = true, force = true),
+            ),
         )
         val after = Files.list(parent).use { s -> s.filter { it.toString().endsWith(".zip") }.toList() }
         val zipFiles = after.filter { p -> before.none { it.toString() == p.toString() } }

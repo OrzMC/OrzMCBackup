@@ -9,8 +9,10 @@ import java.nio.file.Path
 interface McaReaderLike : AutoCloseable {
     /** All chunk entries in the region file. */
     fun entries(): List<McaEntry>
+
     /** Get one chunk by sector index (0-1023), or null if unused. */
     fun get(index: Int): McaEntry?
+
     override fun close()
 }
 
@@ -18,25 +20,40 @@ interface McaReaderLike : AutoCloseable {
 interface McaWriterLike {
     /** Write one chunk entry (4 KiB sector-aligned). */
     fun writeEntry(entry: McaEntry)
+
     /** Flush the location/timestamp header tables to disk. */
     fun finalizeFile()
+
     /** Close the underlying file handle. */
     fun close()
 }
 
 /** Factory for creating [McaReaderLike] and [McaWriterLike] instances for a given [FileSystem]. */
 interface McaIOFactory {
-    fun openReader(fs: FileSystem, path: Path): McaReaderLike
-    fun createWriter(fs: FileSystem, path: Path): McaWriterLike
+    fun openReader(
+        fs: FileSystem,
+        path: Path,
+    ): McaReaderLike
+
+    fun createWriter(
+        fs: FileSystem,
+        path: Path,
+    ): McaWriterLike
 }
 
 class DefaultMcaIOFactory : McaIOFactory {
-    override fun openReader(fs: FileSystem, path: Path): McaReaderLike {
+    override fun openReader(
+        fs: FileSystem,
+        path: Path,
+    ): McaReaderLike {
         val real = fs.toRealPath(path)
         return RealMcaReaderAdapter(McaReader.open(real.toString()))
     }
 
-    override fun createWriter(fs: FileSystem, path: Path): McaWriterLike {
+    override fun createWriter(
+        fs: FileSystem,
+        path: Path,
+    ): McaWriterLike {
         val real = fs.toRealPath(path)
         return RealMcaWriterAdapter(McaWriter(real.toString()))
     }
@@ -61,7 +78,9 @@ class RealMcaWriterAdapter(private val delegate: McaWriter) : McaWriterLike {
 
 class RealMcaReaderAdapter(private val delegate: McaReader) : McaReaderLike {
     override fun entries(): List<McaEntry> = delegate.entries()
+
     override fun get(index: Int): McaEntry? = delegate.get(index)
+
     override fun close() {
         try {
             delegate.close()
@@ -115,13 +134,19 @@ class MemoryMcaWriter(private val mem: MemoryFS, private val path: Path) : McaWr
 }
 
 class MemoryMcaIOFactory : McaIOFactory {
-    override fun openReader(fs: FileSystem, path: Path): McaReaderLike {
+    override fun openReader(
+        fs: FileSystem,
+        path: Path,
+    ): McaReaderLike {
         val mem = fs as? MemoryFS ?: throw IllegalArgumentException("MemoryMcaIOFactory requires MemoryFS")
         val bytes = mem.read(path) ?: ByteArray(0)
         return RealMcaReaderAdapter(McaReader.openFromBytes(path.fileName.toString(), bytes))
     }
 
-    override fun createWriter(fs: FileSystem, path: Path): McaWriterLike {
+    override fun createWriter(
+        fs: FileSystem,
+        path: Path,
+    ): McaWriterLike {
         val mem = fs as? MemoryFS ?: throw IllegalArgumentException("MemoryMcaIOFactory requires MemoryFS")
         return MemoryMcaWriter(mem, path)
     }

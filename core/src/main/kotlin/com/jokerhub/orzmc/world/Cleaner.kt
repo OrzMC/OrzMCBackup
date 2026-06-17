@@ -11,13 +11,24 @@ object Cleaner {
         try {
             val v = Files.getFileAttributeView(p, DosFileAttributeView::class.java)
             if (v != null) {
-                try { v.setReadOnly(false) } catch (_: Exception) {}
-                try { v.setHidden(false) } catch (_: Exception) {}
+                try {
+                    v.setReadOnly(false)
+                } catch (_: Exception) {
+                }
+                try {
+                    v.setHidden(false)
+                } catch (_: Exception) {
+                }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 
-    fun deleteTreeWithRetry(root: Path, attempts: Int, sleepMs: Long): Boolean {
+    fun deleteTreeWithRetry(
+        root: Path,
+        attempts: Int,
+        sleepMs: Long,
+    ): Boolean {
         var i = 0
         while (i < attempts) {
             try {
@@ -27,7 +38,10 @@ object Cleaner {
                 }
                 return true
             } catch (_: Exception) {
-                try { Thread.sleep(sleepMs) } catch (_: Exception) {}
+                try {
+                    Thread.sleep(sleepMs)
+                } catch (_: Exception) {
+                }
                 i++
             }
         }

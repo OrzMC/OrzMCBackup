@@ -18,7 +18,12 @@ fun main() {
     if (Files.exists(region)) {
         Files.list(region).use { stream ->
             stream.filter { it.toString().endsWith(".mca") }.forEach { p ->
-                val size = try { Files.size(p) } catch (_: Exception) { -1L }
+                val size =
+                    try {
+                        Files.size(p)
+                    } catch (_: Exception) {
+                        -1L
+                    }
                 println("MCA: $p size=$size")
             }
         }

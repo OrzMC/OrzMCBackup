@@ -1,15 +1,14 @@
 package com.jokerhub.orzmc
 
+import com.jokerhub.orzmc.util.TestPaths
+import com.jokerhub.orzmc.util.TestTmp
 import com.jokerhub.orzmc.world.*
+import com.jokerhub.orzmc.world.Cleaner
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import java.nio.file.FileSystemException
 import java.nio.file.Files
-import java.nio.file.Paths
-import com.jokerhub.orzmc.world.Cleaner
-import com.jokerhub.orzmc.util.TestPaths
-import com.jokerhub.orzmc.util.TestTmp
 
 class OptimizerConfigParamTest {
     private fun fsFail(e: FileSystemException): Nothing {
@@ -23,33 +22,39 @@ class OptimizerConfigParamTest {
         "false,1",
         "true,1",
         "false,2",
-        "true,2"
+        "true,2",
     )
-    fun `run with OptimizerConfig combinations`(removeUnknown: Boolean, parallelism: Int) {
+    fun `run with OptimizerConfig combinations`(
+        removeUnknown: Boolean,
+        parallelism: Int,
+    ) {
         val input = TestPaths.world()
         val region = input.resolve("region")
-        val mcaCount = try {
-            Files.list(region).use { s -> s.filter { it.fileName.toString().endsWith(".mca") }.count() }
-        } catch (e: FileSystemException) {
-            fsFail(e)
-        }
+        val mcaCount =
+            try {
+                Files.list(region).use { s -> s.filter { it.fileName.toString().endsWith(".mca") }.count() }
+            } catch (e: FileSystemException) {
+                fsFail(e)
+            }
         System.err.println("region/*.mca count: $mcaCount")
         assertTrue(mcaCount > 0)
         val out = TestTmp.createTempDirectory("optimizer-config-out-")
         val events = mutableListOf<ProgressEvent>()
-        val request = OptimizerRequest(
-            input = input,
-            output = out,
-            filter = FilterOptions(inhabitedThresholdSeconds = 0, removeUnknown = removeUnknown),
-            outputOptions = OutputOptions(force = true),
-            progress = ProgressOptions(interval = 100, sink = CallbackProgressSink { e -> events.add(e) }),
-            runtime = RuntimeOptions(parallelism = parallelism)
-        )
-        val report = try {
-            Optimizer.run(request)
-        } catch (e: FileSystemException) {
-            fsFail(e)
-        }
+        val request =
+            OptimizerRequest(
+                input = input,
+                output = out,
+                filter = FilterOptions(inhabitedThresholdSeconds = 0, removeUnknown = removeUnknown),
+                outputOptions = OutputOptions(force = true),
+                progress = ProgressOptions(interval = 100, sink = CallbackProgressSink { e -> events.add(e) }),
+                runtime = RuntimeOptions(parallelism = parallelism),
+            )
+        val report =
+            try {
+                Optimizer.run(request)
+            } catch (e: FileSystemException) {
+                fsFail(e)
+            }
         assertTrue(events.any { it.stage == ProgressStage.Done })
         assertTrue(report.processedChunks > 0)
         Cleaner.deleteTreeWithRetry(out, 5, 10)

@@ -18,17 +18,19 @@ import java.util.concurrent.atomic.AtomicBoolean
 class FailingFileSystem(
     private val delegate: FileSystem,
     private val failOnOps: Set<String> = emptySet(),
-    private val failCounter: MutableMap<String, AtomicBoolean>? = null
+    private val failCounter: MutableMap<String, AtomicBoolean>? = null,
 ) : FileSystem {
-
     constructor(delegate: FileSystem, vararg failOnOps: String) : this(delegate, failOnOps.toSet())
 
     private fun maybeFail(op: String) {
         if (op in failOnOps) throw IOException("injected failure for operation: $op")
-        failCounter?.get(op)?.let { if (it.getAndSet(false)) throw IOException("injected single-shot failure for: $op") }
+        failCounter?.get(
+            op,
+        )?.let { if (it.getAndSet(false)) throw IOException("injected single-shot failure for: $op") }
     }
 
     override fun isDirectory(path: Path): Boolean = delegate.isDirectory(path)
+
     override fun isRegularFile(path: Path): Boolean = delegate.isRegularFile(path)
 
     override fun createTempDirectory(prefix: String): Path {
@@ -58,12 +60,19 @@ class FailingFileSystem(
         delegate.deleteIfExists(path)
     }
 
-    override fun copy(src: Path, dst: Path, replaceExisting: Boolean) {
+    override fun copy(
+        src: Path,
+        dst: Path,
+        replaceExisting: Boolean,
+    ) {
         maybeFail("copy")
         delegate.copy(src, dst, replaceExisting)
     }
 
-    override fun write(path: Path, bytes: ByteArray) {
+    override fun write(
+        path: Path,
+        bytes: ByteArray,
+    ) {
         maybeFail("write")
         delegate.write(path, bytes)
     }
@@ -78,7 +87,11 @@ class FailingFileSystem(
         return delegate.size(path)
     }
 
-    override fun deleteTreeWithRetry(root: Path, attempts: Int, sleepMs: Long): Boolean {
+    override fun deleteTreeWithRetry(
+        root: Path,
+        attempts: Int,
+        sleepMs: Long,
+    ): Boolean {
         maybeFail("deleteTreeWithRetry")
         return delegate.deleteTreeWithRetry(root, attempts, sleepMs)
     }

@@ -1,0 +1,35 @@
+# Changelog
+
+## v0.1.0 (2025-06-17)
+
+### Features
+- 双用途架构：CLI 工具 + 发布到 Maven Central 的库
+- Minecraft Java 世界优化引擎，支持 InhabitedTime 阈值、强制加载列表、矩形区域过滤
+- 全面支持 Minecraft 26.1+ 格式（dimensions/ 目录结构）
+- 完整的 MCA 文件读写（Region/Entities/POI）
+- NBT force-load 解析器，支持新旧两种格式（chunk_tickets.dat / chunks.dat）
+- ZIP 压缩输出、原地替换、Dry-run 预览模式
+- 多维度并行与区域级并行处理
+
+### Dependencies
+- Kotlin `2.4.0`, Gradle `9.5.1`, Shadow `9.4.2`, Kover `0.9.8`
+- JUnit `6.1.0`, Picocli `4.7.7`, Dokka `2.2.0`
+- kotlinx-coroutines-core `1.11.0`, lz4-java `1.8.0`
+
+### Testing
+- MemoryFS + MemoryMcaIOFactory 实现纯内存 E2E 测试
+- 真实 MCA 夹具覆盖三种 Minecraft 格式
+- CI 矩阵：3 OS (Ubuntu/Windows/macOS) × 3 JDK (17/21/25)
+- Kover 覆盖率门禁：line coverage ≥ 75%
+
+### CI/CD
+- `test-matrix.yml` — 三 OS × 三 JDK 测试 + 覆盖率报告
+- `release-app.yml` — CLI shadow JAR 发布到 GitHub Release
+- `release-lib.yml` — 库发布到 Maven Central Portal
+- Dependabot 自动管理 Gradle 和 Actions 依赖更新
+
+### Quality
+- 新增：ktlint + detekt 静态分析
+- 新增：.editorconfig 统一编码风格
+- 新增：Kover 覆盖率门禁
+- 新增：Version Catalog 统一依赖版本管理

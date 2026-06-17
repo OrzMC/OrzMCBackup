@@ -16,7 +16,6 @@ class RangePattern(
     endX: Int,
     endZ: Int,
 ) : ChunkPattern {
-
     private val minX = minOf(startX, endX)
     private val minZ = minOf(startZ, endZ)
     private val maxX = maxOf(startX, endX)

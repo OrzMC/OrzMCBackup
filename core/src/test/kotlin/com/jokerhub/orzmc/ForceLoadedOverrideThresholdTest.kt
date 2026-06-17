@@ -1,11 +1,11 @@
 package com.jokerhub.orzmc
 
+import com.jokerhub.orzmc.mca.McaReader
 import com.jokerhub.orzmc.util.CompressionKind
 import com.jokerhub.orzmc.util.McaMemoryBuilder
 import com.jokerhub.orzmc.util.TestPaths
 import com.jokerhub.orzmc.util.TestTmp
 import com.jokerhub.orzmc.world.*
-import com.jokerhub.orzmc.mca.McaReader
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -24,18 +24,19 @@ class ForceLoadedOverrideThresholdTest {
         Files.createDirectories(input.resolve("region"))
         Files.createDirectories(input.resolve("data"))
         Files.copy(TestPaths.worldDataChunks(), input.resolve("data").resolve("chunks.dat"))
-        val regionName = "r.${regionX}.${regionZ}.mca"
+        val regionName = "r.$regionX.$regionZ.mca"
         val data = McaMemoryBuilder.buildSingleEntryMca(index, 0, CompressionKind.RAW)
         Files.write(input.resolve("region").resolve(regionName), data)
         val out = TestTmp.createTempDirectory("optimizer-force-out-")
-        val report = Optimizer.run(
-            OptimizerRequest(
-                input = input,
-                output = out,
-                filter = FilterOptions(inhabitedThresholdSeconds = 999999),
-                outputOptions = OutputOptions(force = true)
+        val report =
+            Optimizer.run(
+                OptimizerRequest(
+                    input = input,
+                    output = out,
+                    filter = FilterOptions(inhabitedThresholdSeconds = 999999),
+                    outputOptions = OutputOptions(force = true),
+                ),
             )
-        )
         val outRegion = out.resolve("region").resolve(regionName)
         val kept = McaReader.open(outRegion.toString()).use { it.entries().size }
         assertEquals(1, report.processedChunks)

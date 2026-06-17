@@ -11,18 +11,20 @@ import java.nio.ByteOrder
 import java.nio.file.Path
 
 class McaWriterTest {
-
     @Test
-    fun `write entries and finalize produces valid mca file`(@TempDir tempDir: Path) {
+    fun `write entries and finalize produces valid mca file`(
+        @TempDir tempDir: Path,
+    ) {
         val srcFile = tempDir.resolve("r.0.0.mca")
         val outFile = tempDir.resolve("out.mca")
         // Build MCA with entries at indices 0 and 5
-        val mcaBytes = McaMemoryBuilder.buildMca(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW),
-                McaMemoryBuilder.MemChunk(index = 5, inhabited = 2000, kind = CompressionKind.RAW)
+        val mcaBytes =
+            McaMemoryBuilder.buildMca(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 0, inhabited = 1000, kind = CompressionKind.RAW),
+                    McaMemoryBuilder.MemChunk(index = 5, inhabited = 2000, kind = CompressionKind.RAW),
+                ),
             )
-        )
         java.nio.file.Files.write(srcFile, mcaBytes)
 
         // Keep reader open while writer writes (same pattern as DimensionProcessor.process())
@@ -88,7 +90,9 @@ class McaWriterTest {
     }
 
     @Test
-    fun `write no entries produces empty mca`(@TempDir tempDir: Path) {
+    fun `write no entries produces empty mca`(
+        @TempDir tempDir: Path,
+    ) {
         val mcaPath = tempDir.resolve("r.empty.mca")
         val writer = McaWriter(mcaPath.toString())
         try {
@@ -114,7 +118,9 @@ class McaWriterTest {
     }
 
     @Test
-    fun `written file can be read back by McaReader`(@TempDir tempDir: Path) {
+    fun `written file can be read back by McaReader`(
+        @TempDir tempDir: Path,
+    ) {
         val srcFile = tempDir.resolve("r.0.0.mca")
         val outFile = tempDir.resolve("out.mca")
         val rawEntryBytes = McaMemoryBuilder.buildSingleEntryMca(5, 5000, CompressionKind.ZLIB)

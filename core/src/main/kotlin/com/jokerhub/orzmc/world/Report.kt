@@ -12,7 +12,7 @@ import java.nio.file.Files
 data class OptimizeError(
     val path: String,
     val kind: String,
-    val message: String
+    val message: String,
 )
 
 /**
@@ -24,7 +24,7 @@ data class OptimizeError(
 data class OptimizeReport(
     val processedChunks: Long,
     val removedChunks: Long,
-    val errors: List<OptimizeError>
+    val errors: List<OptimizeError>,
 )
 
 /** Serializes [OptimizeReport] to JSON, CSV, or plain text formats. */
@@ -40,11 +40,12 @@ object ReportIO {
                 '\t' -> out.append("\\t")
                 '\b' -> out.append("\\b")
                 '' -> out.append("\\f")
-                else -> if (c.code in 0..0x1F) {
-                    out.append("\\u").append(String.format("%04x", c.code))
-                } else {
-                    out.append(c)
-                }
+                else ->
+                    if (c.code in 0..0x1F) {
+                        out.append("\\u").append(String.format("%04x", c.code))
+                    } else {
+                        out.append(c)
+                    }
             }
         }
         return out.toString()
@@ -68,7 +69,9 @@ object ReportIO {
     fun toCsv(r: OptimizeReport): String {
         val sb = StringBuilder()
         sb.append("processedChunks,removedChunks,errorsCount\n")
-            .append(r.processedChunks).append(",").append(r.removedChunks).append(",").append(r.errors.size).append("\n")
+            .append(
+                r.processedChunks,
+            ).append(",").append(r.removedChunks).append(",").append(r.errors.size).append("\n")
         sb.append("path,kind,message\n")
         r.errors.forEach { e ->
             val path = e.path.replace("\"", "\"\"")
@@ -95,12 +98,17 @@ object ReportIO {
         return sb.toString().trimEnd()
     }
 
-    fun write(r: OptimizeReport, path: java.nio.file.Path, format: String) {
+    fun write(
+        r: OptimizeReport,
+        path: java.nio.file.Path,
+        format: String,
+    ) {
         val fmt = format.lowercase()
-        val content = when (fmt) {
-            "csv" -> toCsv(r)
-            else -> toJson(r)
-        }
+        val content =
+            when (fmt) {
+                "csv" -> toCsv(r)
+                else -> toJson(r)
+            }
         val parent = path.parent
         if (parent != null && !Files.isDirectory(parent)) {
             Files.createDirectories(parent)

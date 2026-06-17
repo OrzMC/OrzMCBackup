@@ -1,7 +1,9 @@
 plugins {
-    kotlin("jvm") version "2.4.0" apply false
-    id("com.gradleup.shadow") version "9.4.2" apply false
-    id("org.jetbrains.kotlinx.kover") version "0.9.8" apply false
+    alias(libs.plugins.kotlin.jvm) apply false
+    alias(libs.plugins.shadow) apply false
+    alias(libs.plugins.kover) apply false
+    alias(libs.plugins.ktlint) apply false
+    alias(libs.plugins.detekt) apply false
 }
 
 // Ensure JDK 17+ for Kotlin compiler compatibility
@@ -22,3 +24,5 @@ allprojects {
     group = "io.github.wangzhizhou"
     version = releasedVersion
 }
+
+// detekt config is per-module (app and core both have detekt plugin)

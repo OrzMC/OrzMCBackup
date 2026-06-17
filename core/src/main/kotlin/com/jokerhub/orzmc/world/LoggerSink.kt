@@ -3,7 +3,9 @@ package com.jokerhub.orzmc.world
 /** Receiver for log messages at various severity levels. */
 interface LoggerSink {
     fun info(msg: String)
+
     fun warn(msg: String)
+
     fun error(msg: String)
 }
 

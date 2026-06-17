@@ -1,27 +1,40 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import java.util.*
+import java.util.Base64
 
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     `maven-publish`
     signing
     `java-test-fixtures`
-    id("org.jetbrains.dokka") version "2.2.0"
-    id("org.jetbrains.kotlinx.kover")
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.kover)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
 }
 
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("detekt.yml"))
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    // detekt 1.23.x requires JDK ≤ 21 for type-resolution compilation.
+    // On JDK 25+ the task is skipped locally; CI runs JDK 21 so it always works.
+    val jvmVersion = System.getProperty("java.version")?.substringBefore(".")?.toIntOrNull() ?: 0
+    onlyIf("detekt requires JDK ≤ 21 (current: $jvmVersion)") { jvmVersion <= 21 }
+}
 
 // Use current JDK; no enforced toolchain to ease local builds
 
 dependencies {
     implementation(kotlin("stdlib"))
-    api("org.lz4:lz4-java:1.8.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
+    api(libs.lz4.java)
+    implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 tasks.test {
@@ -33,12 +46,24 @@ tasks.test {
             org.gradle.api.tasks.testing.logging.TestLogEvent.FAILED,
             org.gradle.api.tasks.testing.logging.TestLogEvent.SKIPPED,
             org.gradle.api.tasks.testing.logging.TestLogEvent.STANDARD_OUT,
-            org.gradle.api.tasks.testing.logging.TestLogEvent.STANDARD_ERROR
+            org.gradle.api.tasks.testing.logging.TestLogEvent.STANDARD_ERROR,
         )
     }
 }
 
 // Test resources are expected under src/test/resources/Fixtures committed to VCS
+
+kover {
+    reports {
+        verify {
+            rule {
+                bound {
+                    minValue = 75
+                }
+            }
+        }
+    }
+}
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -115,20 +140,22 @@ signing {
     val keyId = (findProperty("signing.keyId") as String?)
     val password = (findProperty("signing.password") as String?)
     val key = (findProperty("signing.key") as String?)
-    val normalizedKeyId = keyId?.let {
-        val s = it.removePrefix("0x")
-        val hex40 = Regex("^[0-9A-Fa-f]{40}$")
-        val hex8 = Regex("^[0-9A-Fa-f]{8}$")
-        when {
-            hex40.matches(s) -> s.takeLast(8).uppercase()
-            hex8.matches(s) -> s.uppercase()
-            else -> it
+    val normalizedKeyId =
+        keyId?.let {
+            val s = it.removePrefix("0x")
+            val hex40 = Regex("^[0-9A-Fa-f]{40}$")
+            val hex8 = Regex("^[0-9A-Fa-f]{8}$")
+            when {
+                hex40.matches(s) -> s.takeLast(8).uppercase()
+                hex8.matches(s) -> s.uppercase()
+                else -> it
+            }
         }
-    }
     if (!key.isNullOrBlank()) {
-        val decoded = runCatching {
-            String(Base64.getDecoder().decode(key), Charsets.UTF_8)
-        }.getOrElse { key }
+        val decoded =
+            runCatching {
+                String(Base64.getDecoder().decode(key), Charsets.UTF_8)
+            }.getOrElse { key }
         useInMemoryPgpKeys(normalizedKeyId, decoded, password)
         sign(publishing.publications["mavenJava"])
     }

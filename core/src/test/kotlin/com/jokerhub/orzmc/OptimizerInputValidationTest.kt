@@ -23,13 +23,14 @@ class OptimizerInputValidationTest {
     fun `input is not directory returns input error`() {
         val input = Files.createTempFile("optimizer-input-file-", ".tmp")
         val out = TestTmp.createTempDirectory("optimizer-out-input-")
-        val report = Optimizer.run(
-            OptimizerRequest(
-                input = input,
-                output = out,
-                filter = FilterOptions(inhabitedThresholdSeconds = 0)
+        val report =
+            Optimizer.run(
+                OptimizerRequest(
+                    input = input,
+                    output = out,
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                ),
             )
-        )
         assertEquals(0, report.processedChunks)
         assertTrue(report.errors.any { it.kind == "Input" })
         Files.deleteIfExists(input)
@@ -39,13 +40,14 @@ class OptimizerInputValidationTest {
     @Test
     fun `output missing without inPlace returns output error`() {
         val input = createWorldWithEntry()
-        val report = Optimizer.run(
-            OptimizerRequest(
-                input = input,
-                output = null,
-                filter = FilterOptions(inhabitedThresholdSeconds = 0)
+        val report =
+            Optimizer.run(
+                OptimizerRequest(
+                    input = input,
+                    output = null,
+                    filter = FilterOptions(inhabitedThresholdSeconds = 0),
+                ),
             )
-        )
         assertEquals(0, report.processedChunks)
         assertTrue(report.errors.any { it.kind == "Output" })
         Cleaner.deleteTreeWithRetry(input, 5, 10)

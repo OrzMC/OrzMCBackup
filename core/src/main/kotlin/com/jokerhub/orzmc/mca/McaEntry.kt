@@ -30,14 +30,19 @@ class McaEntry(
 
     /** Index within the sector table (0-1023). Maps to (x = index % 32, z = index / 32) within the region. */
     fun regionIndex(): Int = index
+
     /** Local X coordinate within the region (0-31). */
     fun xPos(): Int = index % 32
+
     /** Local Z coordinate within the region (0-31). */
     fun zPos(): Int = index / 32
+
     /** Global X coordinate across the world. */
     fun globalX(): Int = regionX * 32 + xPos()
+
     /** Global Z coordinate across the world. */
     fun globalZ(): Int = regionZ * 32 + zPos()
+
     /** Timestamp of last modification (Unix epoch seconds). */
     fun modifiedTime(): Int = modified
 
@@ -47,18 +52,19 @@ class McaEntry(
         file.readFully(header)
         val len = ByteBuffer.wrap(header, 0, 4).order(ByteOrder.BIG_ENDIAN).int
         val methodByte = header[4].toInt()
-        val method = when (methodByte.toByte().toInt()) {
-            1 -> CompressionMethod.GZIP
-            2 -> CompressionMethod.ZLIB
-            3 -> CompressionMethod.RAW
-            4 -> CompressionMethod.LZ4
-            127 -> CompressionMethod.CUSTOM
-            -127 -> CompressionMethod.EXT_GZIP
-            -126 -> CompressionMethod.EXT_ZLIB
-            -125 -> CompressionMethod.EXT_RAW
-            -124 -> CompressionMethod.EXT_LZ4
-            else -> throw IllegalArgumentException("unknown compression: $methodByte")
-        }
+        val method =
+            when (methodByte.toByte().toInt()) {
+                1 -> CompressionMethod.GZIP
+                2 -> CompressionMethod.ZLIB
+                3 -> CompressionMethod.RAW
+                4 -> CompressionMethod.LZ4
+                127 -> CompressionMethod.CUSTOM
+                -127 -> CompressionMethod.EXT_GZIP
+                -126 -> CompressionMethod.EXT_ZLIB
+                -125 -> CompressionMethod.EXT_RAW
+                -124 -> CompressionMethod.EXT_LZ4
+                else -> throw IllegalArgumentException("unknown compression: $methodByte")
+            }
         var custom: String? = null
         if (method == CompressionMethod.CUSTOM) {
             val nameLenBuf = ByteArray(2)
@@ -112,7 +118,10 @@ class McaEntry(
 
     fun isExternal(): Boolean {
         val (_, method, _) = readHeader()
-        return method == CompressionMethod.EXT_GZIP || method == CompressionMethod.EXT_ZLIB || method == CompressionMethod.EXT_RAW || method == CompressionMethod.EXT_LZ4
+        return method == CompressionMethod.EXT_GZIP ||
+            method == CompressionMethod.EXT_ZLIB ||
+            method == CompressionMethod.EXT_RAW ||
+            method == CompressionMethod.EXT_LZ4
     }
 
     companion object {
@@ -120,7 +129,10 @@ class McaEntry(
         private const val LZ4_HEADER_LEN = 8 + 1 + 4 + 4 + 4
         private const val LZ4_XXHASH_SEED = 0x9747b28c.toInt()
 
-        private fun xxh32(data: ByteArray, seed: Int): Int {
+        private fun xxh32(
+            data: ByteArray,
+            seed: Int,
+        ): Int {
             val factory = XXHashFactory.fastestInstance()
             val hasher = factory.hash32()
             return hasher.hash(data, 0, data.size, seed)
@@ -133,7 +145,9 @@ class McaEntry(
             while (i + LZ4_HEADER_LEN <= inp.size) {
                 if (!inp.copyOfRange(i, i + 8)
                         .contentEquals(LZ4_MAGIC)
-                ) throw IllegalArgumentException("invalid LZ4 magic")
+                ) {
+                    throw IllegalArgumentException("invalid LZ4 magic")
+                }
                 val token = inp[i + 8].toInt()
                 val method = token and 0xF0
                 val compLen = ByteBuffer.wrap(inp, i + 9, 4).order(ByteOrder.LITTLE_ENDIAN).int
@@ -142,16 +156,17 @@ class McaEntry(
                 val start = i + LZ4_HEADER_LEN
                 if (start + compLen > inp.size) throw IllegalArgumentException("LZ4 block truncated")
                 val block = inp.copyOfRange(start, start + compLen)
-                val decoded = when (method) {
-                    0x10 -> block // RAW
-                    0x20 -> {
-                        val dest = ByteArray(decompLen)
-                        lz4.decompress(block, 0, block.size, dest, 0)
-                        dest
-                    }
+                val decoded =
+                    when (method) {
+                        0x10 -> block // RAW
+                        0x20 -> {
+                            val dest = ByteArray(decompLen)
+                            lz4.decompress(block, 0, block.size, dest, 0)
+                            dest
+                        }
 
-                    else -> throw IllegalArgumentException("unsupported LZ4 method")
-                }
+                        else -> throw IllegalArgumentException("unsupported LZ4 method")
+                    }
                 val checksum = (xxh32(decoded, LZ4_XXHASH_SEED) and 0x0FFFFFFF)
                 if (checksum != checksumLe) throw IllegalArgumentException("LZ4 checksum mismatch")
                 out.write(decoded)

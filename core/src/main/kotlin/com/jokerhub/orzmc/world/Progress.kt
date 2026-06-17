@@ -4,28 +4,39 @@ package com.jokerhub.orzmc.world
 enum class ProgressStage {
     /** Initialization */
     Init,
+
     /** Discovering dimensions */
     Discover,
+
     /** Processing started for one dimension */
     DimensionStart,
+
     /** Processing started for one region file */
     RegionStart,
+
     /** Chunk-level progress update */
     ChunkProgress,
+
     /** Processing finished for one dimension */
     DimensionEnd,
+
     /** Finalizing writes */
     Finalize,
+
     /** Copying miscellaneous (non-MCA) files */
     CopyMisc,
+
     /** Progress update during misc file copy */
     CopyMiscProgress,
+
     /** Compressing output to zip archive */
     Compress,
+
     /** Cleaning up temporary files */
     Cleanup,
+
     /** Processing complete */
-    Done
+    Done,
 }
 
 /**
@@ -41,5 +52,5 @@ data class ProgressEvent(
     val current: Long? = null,
     val total: Long? = null,
     val path: String? = null,
-    val message: String? = null
+    val message: String? = null,
 )

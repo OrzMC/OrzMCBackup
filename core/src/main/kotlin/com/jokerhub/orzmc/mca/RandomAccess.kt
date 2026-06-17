@@ -6,10 +6,17 @@ import java.io.RandomAccessFile
 interface RandomAccess {
     /** Move to position [pos]. */
     fun seek(pos: Long)
+
     /** Read exactly `buf.size` bytes into [buf]. */
     fun readFully(buf: ByteArray)
+
     /** Read exactly [len] bytes into [buf] at offset [off]. */
-    fun readFully(buf: ByteArray, off: Int, len: Int)
+    fun readFully(
+        buf: ByteArray,
+        off: Int,
+        len: Int,
+    )
+
     /** Close and release resources. */
     fun close()
 }
@@ -24,7 +31,11 @@ class RafAccess(private val raf: RandomAccessFile) : RandomAccess {
         raf.readFully(buf)
     }
 
-    override fun readFully(buf: ByteArray, off: Int, len: Int) {
+    override fun readFully(
+        buf: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
         raf.readFully(buf, off, len)
     }
 
@@ -44,7 +55,7 @@ class RafAccess(private val raf: RandomAccessFile) : RandomAccess {
 class BufferedRafAccess(
     private val delegate: RafAccess,
     private val fileLength: Long,
-    private val bufferSize: Int = 8192
+    private val bufferSize: Int = 8192,
 ) : RandomAccess {
     private var buf = ByteArray(bufferSize)
     private var bufStart = -1L
@@ -82,7 +93,11 @@ class BufferedRafAccess(
         readFully(buf, 0, buf.size)
     }
 
-    override fun readFully(dst: ByteArray, off: Int, len: Int) {
+    override fun readFully(
+        dst: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
         var remaining = len
         var dstOff = off
         while (remaining > 0) {
@@ -106,6 +121,7 @@ class BufferedRafAccess(
 
 class MemoryAccess(private val data: ByteArray) : RandomAccess {
     private var pos: Int = 0
+
     override fun seek(pos: Long) {
         this.pos = pos.toInt()
     }
@@ -115,7 +131,11 @@ class MemoryAccess(private val data: ByteArray) : RandomAccess {
         pos += buf.size
     }
 
-    override fun readFully(buf: ByteArray, off: Int, len: Int) {
+    override fun readFully(
+        buf: ByteArray,
+        off: Int,
+        len: Int,
+    ) {
         System.arraycopy(data, pos, buf, off, len)
         pos += len
     }

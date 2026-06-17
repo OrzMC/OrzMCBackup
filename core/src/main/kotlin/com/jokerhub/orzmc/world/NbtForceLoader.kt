@@ -1,26 +1,26 @@
 package com.jokerhub.orzmc.world
 
-import java.io.File
 import java.io.BufferedInputStream
 import java.io.DataInputStream
+import java.io.File
 import java.nio.charset.StandardCharsets
 import java.util.zip.GZIPInputStream
 
-private const val TAG_End: Byte = 0
-private const val TAG_Byte: Byte = 1
-private const val TAG_Short: Byte = 2
-private const val TAG_Int: Byte = 3
-private const val TAG_Long: Byte = 4
-private const val TAG_Float: Byte = 5
-private const val TAG_Double: Byte = 6
-private const val TAG_Byte_Array: Byte = 7
-private const val TAG_String: Byte = 8
-private const val TAG_List: Byte = 9
-private const val TAG_Compound: Byte = 10
-private const val TAG_Int_Array: Byte = 11
-private const val TAG_Long_Array: Byte = 12
+private const val TAG_END: Byte = 0
+private const val TAG_BYTE: Byte = 1
+private const val TAG_SHORT: Byte = 2
+private const val TAG_INT: Byte = 3
+private const val TAG_LONG: Byte = 4
+private const val TAG_FLOAT: Byte = 5
+private const val TAG_DOUBLE: Byte = 6
+private const val TAG_BYTE_ARRAY: Byte = 7
+private const val TAG_STRING: Byte = 8
+private const val TAG_LIST: Byte = 9
+private const val TAG_COMPOUND: Byte = 10
+private const val TAG_INT_ARRAY: Byte = 11
+private const val TAG_LONG_ARRAY: Byte = 12
 
-private const val DEFAULT_MAX_ARRAY_SIZE = 10 * 1024 * 1024  // 10 MB
+private const val DEFAULT_MAX_ARRAY_SIZE = 10 * 1024 * 1024 // 10 MB
 private const val DEFAULT_MAX_LIST_LENGTH = 65536
 private const val DEFAULT_MAX_COMPOUND_DEPTH = 64
 
@@ -45,12 +45,12 @@ object NbtForceLoader {
         file: File,
         maxArraySize: Int = DEFAULT_MAX_ARRAY_SIZE,
         maxListLength: Int = DEFAULT_MAX_LIST_LENGTH,
-        maxCompoundDepth: Int = DEFAULT_MAX_COMPOUND_DEPTH
+        maxCompoundDepth: Int = DEFAULT_MAX_COMPOUND_DEPTH,
     ): List<Pair<Int, Int>> {
         GZIPInputStream(BufferedInputStream(file.inputStream())).use { gz ->
             val inp = DataInputStream(gz)
             val rootType = inp.readByte()
-            require(rootType == TAG_Compound) { "root must be Compound" }
+            require(rootType == TAG_COMPOUND) { "root must be Compound" }
             readUtf(inp)
             val compound = readCompound(inp, 0, maxCompoundDepth, maxArraySize, maxListLength)
             val dataTag = compound["data"] as? Map<*, *> ?: return emptyList()
@@ -90,7 +90,7 @@ object NbtForceLoader {
         depth: Int,
         maxCompoundDepth: Int,
         maxArraySize: Int,
-        maxListLength: Int
+        maxListLength: Int,
     ): Any {
         val elemType = inp.readByte()
         val len = inp.readInt()
@@ -109,7 +109,7 @@ object NbtForceLoader {
         depth: Int,
         maxCompoundDepth: Int,
         maxArraySize: Int,
-        maxListLength: Int
+        maxListLength: Int,
     ): Map<String, Any> {
         require(depth <= maxCompoundDepth) {
             "NBT compound depth $depth exceeds maximum $maxCompoundDepth"
@@ -117,7 +117,7 @@ object NbtForceLoader {
         val m = HashMap<String, Any>()
         while (true) {
             val t = inp.readByte()
-            if (t == TAG_End) break
+            if (t == TAG_END) break
             val name = readUtf(inp)
             val v = readPayload(inp, t, depth + 1, maxCompoundDepth, maxArraySize, maxListLength)
             m[name] = v
@@ -131,16 +131,16 @@ object NbtForceLoader {
         depth: Int,
         maxCompoundDepth: Int,
         maxArraySize: Int,
-        maxListLength: Int
+        maxListLength: Int,
     ): Any {
         return when (t) {
-            TAG_Byte -> inp.readByte()
-            TAG_Short -> inp.readShort()
-            TAG_Int -> inp.readInt()
-            TAG_Long -> inp.readLong()
-            TAG_Float -> inp.readFloat()
-            TAG_Double -> inp.readDouble()
-            TAG_Byte_Array -> {
+            TAG_BYTE -> inp.readByte()
+            TAG_SHORT -> inp.readShort()
+            TAG_INT -> inp.readInt()
+            TAG_LONG -> inp.readLong()
+            TAG_FLOAT -> inp.readFloat()
+            TAG_DOUBLE -> inp.readDouble()
+            TAG_BYTE_ARRAY -> {
                 val len = inp.readInt()
                 require(len >= 0 && len <= maxArraySize) {
                     "NBT ByteArray length $len exceeds maximum $maxArraySize"
@@ -149,10 +149,10 @@ object NbtForceLoader {
                 inp.readFully(arr)
                 arr
             }
-            TAG_String -> readUtf(inp)
-            TAG_List -> readList(inp, depth, maxCompoundDepth, maxArraySize, maxListLength)
-            TAG_Compound -> readCompound(inp, depth, maxCompoundDepth, maxArraySize, maxListLength)
-            TAG_Int_Array -> {
+            TAG_STRING -> readUtf(inp)
+            TAG_LIST -> readList(inp, depth, maxCompoundDepth, maxArraySize, maxListLength)
+            TAG_COMPOUND -> readCompound(inp, depth, maxCompoundDepth, maxArraySize, maxListLength)
+            TAG_INT_ARRAY -> {
                 val len = inp.readInt()
                 require(len >= 0 && len <= maxArraySize) {
                     "NBT IntArray length $len exceeds maximum $maxArraySize"
@@ -161,7 +161,7 @@ object NbtForceLoader {
                 for (i in 0 until len) arr[i] = inp.readInt()
                 arr
             }
-            TAG_Long_Array -> {
+            TAG_LONG_ARRAY -> {
                 val len = inp.readInt()
                 require(len >= 0 && len <= maxArraySize) {
                     "NBT LongArray length $len exceeds maximum $maxArraySize"

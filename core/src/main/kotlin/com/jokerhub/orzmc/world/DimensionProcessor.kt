@@ -5,12 +5,12 @@ import java.nio.file.Path
 
 data class DimensionResult(
     val processed: Long,
-    val removed: Long
+    val removed: Long,
 )
 
 private data class RegionResult(
     val processed: Long,
-    val removed: Long
+    val removed: Long,
 )
 
 internal object DimensionProcessor {
@@ -40,7 +40,7 @@ internal object DimensionProcessor {
         processedCounter: java.util.concurrent.atomic.AtomicLong,
         strict: Boolean,
         regionParallelism: Int = 1,
-        dryRun: Boolean = false
+        dryRun: Boolean = false,
     ): DimensionResult {
         var removedTotal = 0L
         fs.createDirectories(targetDim)
@@ -60,22 +60,29 @@ internal object DimensionProcessor {
             // Parallel region processing
             val executor = java.util.concurrent.Executors.newFixedThreadPool(regionParallelism)
             try {
-                val futures = regionFiles.map { rf ->
-                    executor.submit(java.util.concurrent.Callable {
-                        processSingleRegion(
-                            fs, ioFactory, inputDim, targetDim, patterns,
-                            onError, progressSink, totalChunks, progressInterval,
-                            progressIntervalMs, processedCounter, strict,
-                            useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun
+                val futures =
+                    regionFiles.map { rf ->
+                        executor.submit(
+                            java.util.concurrent.Callable {
+                                processSingleRegion(
+                                    fs, ioFactory, inputDim, targetDim, patterns,
+                                    onError, progressSink, totalChunks, progressInterval,
+                                    progressIntervalMs, processedCounter, strict,
+                                    useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun,
+                                )
+                            },
                         )
-                    })
-                }
+                    }
                 futures.forEach { f ->
                     try {
                         val r = f.get()
                         removedTotal += r.removed
                     } catch (e: Exception) {
-                        onError(inputDim, "Parallel", "Region parallel processing failed: ${e.message ?: "unknown error"}")
+                        onError(
+                            inputDim,
+                            "Parallel",
+                            "Region parallel processing failed: ${e.message ?: "unknown error"}",
+                        )
                     }
                 }
             } finally {
@@ -84,12 +91,13 @@ internal object DimensionProcessor {
         } else {
             // Sequential region processing (original behavior)
             regionFiles.forEach { rf ->
-                val r = processSingleRegion(
-                    fs, ioFactory, inputDim, targetDim, patterns,
-                    onError, progressSink, totalChunks, progressInterval,
-                    progressIntervalMs, processedCounter, strict,
-                    useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun
-                )
+                val r =
+                    processSingleRegion(
+                        fs, ioFactory, inputDim, targetDim, patterns,
+                        onError, progressSink, totalChunks, progressInterval,
+                        progressIntervalMs, processedCounter, strict,
+                        useTime, lastEmit, regionDir, entitiesDir, poiDir, rf, dryRun,
+                    )
                 removedTotal += r.removed
             }
         }
@@ -117,7 +125,7 @@ internal object DimensionProcessor {
         entitiesDir: Path,
         poiDir: Path,
         rf: Path,
-        dryRun: Boolean = false
+        dryRun: Boolean = false,
     ): RegionResult {
         var localRemoved = 0L
         var localLastEmit = lastEmit
@@ -130,41 +138,56 @@ internal object DimensionProcessor {
         val name = rf.fileName.toString()
         val efile = entitiesDir.resolve(name)
         val pfile = poiDir.resolve(name)
-        val cr = try { ioFactory.openReader(fs, rf) } catch (e: Exception) {
-            onError(rf, ERR_MCA, "Failed to read MCA file: ${e.message}")
-            return RegionResult(0, 0)
-        }
+        val cr =
+            try {
+                ioFactory.openReader(fs, rf)
+            } catch (e: Exception) {
+                onError(rf, ERR_MCA, "Failed to read MCA file: ${e.message}")
+                return RegionResult(0, 0)
+            }
         // Defer writer creation until after we know there are entries to keep.
         // This avoids writing empty MCA files when all chunks are removed.
         var cw: McaWriterLike? = null
         var ew: McaWriterLike? = null
         var pw: McaWriterLike? = null
-        val er: McaReaderLike? = try {
-            if (fs.isRegularFile(efile) && McaUtils.isValidMca(fs, efile)) {
-                ioFactory.openReader(fs, efile)
-            } else null
-        } catch (e: Exception) {
-            onError(efile, ERR_ENTITIES, "Failed to read entities: ${e.message}")
-            null
-        }
-        val pr: McaReaderLike? = try {
-            if (fs.isRegularFile(pfile) && McaUtils.isValidMca(fs, pfile)) {
-                ioFactory.openReader(fs, pfile)
-            } else null
-        } catch (e: Exception) {
-            onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
-            null
-        }
-        try {
-            val entries = try { cr.entries() } catch (e: Exception) {
-                onError(rf, ERR_ENTRIES, "Failed to read chunk entries: ${e.message}")
-                emptyList()
+        val er: McaReaderLike? =
+            try {
+                if (fs.isRegularFile(efile) && McaUtils.isValidMca(fs, efile)) {
+                    ioFactory.openReader(fs, efile)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                onError(efile, ERR_ENTITIES, "Failed to read entities: ${e.message}")
+                null
             }
+        val pr: McaReaderLike? =
+            try {
+                if (fs.isRegularFile(pfile) && McaUtils.isValidMca(fs, pfile)) {
+                    ioFactory.openReader(fs, pfile)
+                } else {
+                    null
+                }
+            } catch (e: Exception) {
+                onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
+                null
+            }
+        try {
+            val entries =
+                try {
+                    cr.entries()
+                } catch (e: Exception) {
+                    onError(rf, ERR_ENTRIES, "Failed to read chunk entries: ${e.message}")
+                    emptyList()
+                }
             for (entry in entries) {
                 var keep = false
                 for (p in patterns) {
                     try {
-                        if (p.matches(entry)) { keep = true; break }
+                        if (p.matches(entry)) {
+                            keep = true
+                            break
+                        }
                     } catch (e: Exception) {
                         onError(rf, ERR_PATTERN, "Pattern matching failed: ${e.message}")
                     }
@@ -176,11 +199,23 @@ internal object DimensionProcessor {
                         if (er != null) ew = ioFactory.createWriter(fs, targetDim.resolve("entities").resolve(name))
                         if (pr != null) pw = ioFactory.createWriter(fs, targetDim.resolve("poi").resolve(name))
                     }
-                    try { cw?.writeEntry(entry) } catch (e: Exception) { onError(rf, ERR_WRITE, "Failed to write entry: ${e.message}") }
+                    try {
+                        cw?.writeEntry(entry)
+                    } catch (
+                        e: Exception,
+                    ) {
+                        onError(rf, ERR_WRITE, "Failed to write entry: ${e.message}")
+                    }
                     try {
                         val eentry = er?.get(entry.regionIndex())
                         if (eentry != null && ew != null) {
-                            try { ew.writeEntry(eentry) } catch (e: Exception) { onError(efile, ERR_WRITE_ENTITIES, "Failed to write entity entry: ${e.message}") }
+                            try {
+                                ew.writeEntry(eentry)
+                            } catch (
+                                e: Exception,
+                            ) {
+                                onError(efile, ERR_WRITE_ENTITIES, "Failed to write entity entry: ${e.message}")
+                            }
                         }
                     } catch (e: Exception) {
                         onError(efile, ERR_ENTITIES, "Failed to read entities: ${e.message}")
@@ -188,7 +223,13 @@ internal object DimensionProcessor {
                     try {
                         val pentry = pr?.get(entry.regionIndex())
                         if (pentry != null && pw != null) {
-                            try { pw.writeEntry(pentry) } catch (e: Exception) { onError(pfile, ERR_WRITE_POI, "Failed to write POI entry: ${e.message}") }
+                            try {
+                                pw.writeEntry(pentry)
+                            } catch (
+                                e: Exception,
+                            ) {
+                                onError(pfile, ERR_WRITE_POI, "Failed to write POI entry: ${e.message}")
+                            }
                         }
                     } catch (e: Exception) {
                         onError(pfile, ERR_POI, "Failed to read POI: ${e.message}")
@@ -200,23 +241,63 @@ internal object DimensionProcessor {
                 if (useTime) {
                     val now = System.currentTimeMillis()
                     if (now - localLastEmit >= progressIntervalMs) {
-                        progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                        progressSink.emit(
+                            ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null),
+                        )
                         localLastEmit = now
                     }
                 } else if (progressInterval > 0 && processed % progressInterval == 0L) {
-                    progressSink.emit(ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null))
+                    progressSink.emit(
+                        ProgressEvent(ProgressStage.ChunkProgress, processed, totalChunks, rf.toString(), null),
+                    )
                 }
             }
-            try { cw?.finalizeFile() } catch (e: Exception) { onError(rf, ERR_FINALIZE, "Failed to finalize write: ${e.message}") }
-            try { ew?.finalizeFile() } catch (e: Exception) { onError(efile, ERR_FINALIZE_ENTITIES, "Failed to finalize entity write: ${e.message}") }
-            try { pw?.finalizeFile() } catch (e: Exception) { onError(pfile, ERR_FINALIZE_POI, "Failed to finalize POI write: ${e.message}") }
+            try {
+                cw?.finalizeFile()
+            } catch (
+                e: Exception,
+            ) {
+                onError(rf, ERR_FINALIZE, "Failed to finalize write: ${e.message}")
+            }
+            try {
+                ew?.finalizeFile()
+            } catch (
+                e: Exception,
+            ) {
+                onError(efile, ERR_FINALIZE_ENTITIES, "Failed to finalize entity write: ${e.message}")
+            }
+            try {
+                pw?.finalizeFile()
+            } catch (
+                e: Exception,
+            ) {
+                onError(pfile, ERR_FINALIZE_POI, "Failed to finalize POI write: ${e.message}")
+            }
         } finally {
-            try { cr.close() } catch (_: Exception) {}
-            try { cw?.close() } catch (_: Exception) {}
-            try { er?.close() } catch (_: Exception) {}
-            try { pr?.close() } catch (_: Exception) {}
-            try { ew?.close() } catch (_: Exception) {}
-            try { pw?.close() } catch (_: Exception) {}
+            try {
+                cr.close()
+            } catch (_: Exception) {
+            }
+            try {
+                cw?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                er?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                pr?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                ew?.close()
+            } catch (_: Exception) {
+            }
+            try {
+                pw?.close()
+            } catch (_: Exception) {
+            }
         }
 
         return RegionResult(0, localRemoved)

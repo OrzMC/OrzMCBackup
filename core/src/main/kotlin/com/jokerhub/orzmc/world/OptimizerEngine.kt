@@ -14,5 +14,10 @@ import java.nio.file.Path
  */
 interface OptimizerEngine {
     fun run(request: OptimizerRequest): OptimizeReport
-    fun run(input: Path, output: Path? = null, block: OptimizerRequestBuilder.() -> Unit = {}): OptimizeReport
+
+    fun run(
+        input: Path,
+        output: Path? = null,
+        block: OptimizerRequestBuilder.() -> Unit = {},
+    ): OptimizeReport
 }

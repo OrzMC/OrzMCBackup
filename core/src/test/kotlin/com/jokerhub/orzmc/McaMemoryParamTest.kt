@@ -20,9 +20,13 @@ class McaMemoryParamTest {
         "ZLIB,1001,1",
         "LZ4,0,0",
         "LZ4,1000,1",
-        "LZ4,1001,1"
+        "LZ4,1001,1",
     )
-    fun `memory mca with inhabited threshold and compression`(comp: String, threshold: Long, removedExpected: Long) {
+    fun `memory mca with inhabited threshold and compression`(
+        comp: String,
+        threshold: Long,
+        removedExpected: Long,
+    ) {
         val fs = MemoryFS()
         val world = java.nio.file.Paths.get("/mem/world")
         fs.createDirectories(world)
@@ -31,12 +35,13 @@ class McaMemoryParamTest {
         val bytes = McaMemoryBuilder.buildSingleEntryMca(0, 1000L, method)
         fs.write(world.resolve("region").resolve("r.0.0.mca"), bytes)
         val out = java.nio.file.Paths.get("/mem/out")
-        val request = OptimizerRequest(
-            input = world,
-            output = out,
-            filter = FilterOptions(inhabitedThresholdSeconds = threshold),
-            io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
-        )
+        val request =
+            OptimizerRequest(
+                input = world,
+                output = out,
+                filter = FilterOptions(inhabitedThresholdSeconds = threshold),
+                io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory()),
+            )
         val report = Optimizer.run(request)
         assertTrue(report.processedChunks >= 1)
         assertEquals(removedExpected, report.removedChunks)

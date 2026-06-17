@@ -14,30 +14,54 @@ import java.nio.file.StandardCopyOption
 interface FileSystem {
     /** Returns true if [path] exists and is a directory. */
     fun isDirectory(path: Path): Boolean
+
     /** Returns true if [path] exists and is a regular file. */
     fun isRegularFile(path: Path): Boolean
+
     /** Create a temporary directory with the given prefix. */
     fun createTempDirectory(prefix: String): Path
+
     /** Returns true if [path] exists (file or directory). */
     fun exists(path: Path): Boolean
+
     /** List direct children of [path]. Order is unspecified. */
     fun list(path: Path): List<Path>
+
     /** Recursively walk all descendants of [path]. */
     fun walk(path: Path): List<Path>
+
     /** Create directory and any missing parents. */
     fun createDirectories(path: Path)
+
     /** Delete [path] if it exists. No-op if absent. */
     fun deleteIfExists(path: Path)
+
     /** Copy [src] to [dst]. Optionally replace existing. */
-    fun copy(src: Path, dst: Path, replaceExisting: Boolean = true)
+    fun copy(
+        src: Path,
+        dst: Path,
+        replaceExisting: Boolean = true,
+    )
+
     /** Write [bytes] to [path], overwriting if exists. */
-    fun write(path: Path, bytes: ByteArray)
+    fun write(
+        path: Path,
+        bytes: ByteArray,
+    )
+
     /** Read all bytes from [path], or null if absent/error. */
     fun read(path: Path): ByteArray?
+
     /** File size in bytes, or 0 if absent. */
     fun size(path: Path): Long
+
     /** Delete [root] and all its contents, retrying up to [attempts] times. */
-    fun deleteTreeWithRetry(root: Path, attempts: Int, sleepMs: Long): Boolean
+    fun deleteTreeWithRetry(
+        root: Path,
+        attempts: Int,
+        sleepMs: Long,
+    ): Boolean
+
     /** Resolve to a real filesystem path (writes MemoryFS contents to disk if needed). */
     fun toRealPath(path: Path): Path
 }
@@ -48,9 +72,13 @@ interface FileSystem {
  */
 object RealFileSystem : FileSystem {
     override fun isDirectory(path: Path): Boolean = Files.isDirectory(path)
+
     override fun isRegularFile(path: Path): Boolean = Files.isRegularFile(path)
+
     override fun createTempDirectory(prefix: String): Path = Files.createTempDirectory(prefix)
+
     override fun exists(path: Path): Boolean = Files.exists(path)
+
     override fun list(path: Path): List<Path> {
         val s = Files.list(path)
         return try {
@@ -83,24 +111,36 @@ object RealFileSystem : FileSystem {
         Files.deleteIfExists(path)
     }
 
-    override fun copy(src: Path, dst: Path, replaceExisting: Boolean) {
+    override fun copy(
+        src: Path,
+        dst: Path,
+        replaceExisting: Boolean,
+    ) {
         val opt = if (replaceExisting) StandardCopyOption.REPLACE_EXISTING else null
         if (opt != null) Files.copy(src, dst, opt) else Files.copy(src, dst)
     }
 
-    override fun write(path: Path, bytes: ByteArray) {
+    override fun write(
+        path: Path,
+        bytes: ByteArray,
+    ) {
         Files.write(path, bytes)
     }
 
-    override fun read(path: Path): ByteArray? = try {
-        Files.readAllBytes(path)
-    } catch (_: Exception) {
-        null
-    }
+    override fun read(path: Path): ByteArray? =
+        try {
+            Files.readAllBytes(path)
+        } catch (_: Exception) {
+            null
+        }
 
     override fun size(path: Path): Long = Files.size(path)
 
-    override fun deleteTreeWithRetry(root: Path, attempts: Int, sleepMs: Long): Boolean {
+    override fun deleteTreeWithRetry(
+        root: Path,
+        attempts: Int,
+        sleepMs: Long,
+    ): Boolean {
         var i = 0
         while (i < attempts) {
             try {
@@ -136,14 +176,16 @@ class MemoryFS : FileSystem {
 
     private val nodes = java.util.concurrent.ConcurrentHashMap<Path, NodeType>()
     private val contents = java.util.concurrent.ConcurrentHashMap<Path, ByteArray>()
+
     @Volatile
     private var stagingRoot: Path? = null
 
     override fun isDirectory(path: Path): Boolean = nodes[path] == NodeType.DIRECTORY
+
     override fun isRegularFile(path: Path): Boolean = nodes[path] == NodeType.FILE
 
     override fun createTempDirectory(prefix: String): Path {
-        val p = java.nio.file.Paths.get("/mem-${prefix}-${System.currentTimeMillis()}")
+        val p = java.nio.file.Paths.get("/mem-$prefix-${System.currentTimeMillis()}")
         nodes[p] = NodeType.DIRECTORY
         return p
     }
@@ -172,7 +214,11 @@ class MemoryFS : FileSystem {
         contents.remove(path)
     }
 
-    override fun copy(src: Path, dst: Path, replaceExisting: Boolean) {
+    override fun copy(
+        src: Path,
+        dst: Path,
+        replaceExisting: Boolean,
+    ) {
         val nodeType = nodes[src] ?: throw IOException("source not found: $src")
         if (!replaceExisting && nodes.containsKey(dst)) throw IOException("dest exists: $dst")
         when (nodeType) {
@@ -187,7 +233,10 @@ class MemoryFS : FileSystem {
         }
     }
 
-    override fun write(path: Path, bytes: ByteArray) {
+    override fun write(
+        path: Path,
+        bytes: ByteArray,
+    ) {
         nodes[path] = NodeType.FILE
         contents[path] = bytes
     }
@@ -199,7 +248,11 @@ class MemoryFS : FileSystem {
         return data.size.toLong()
     }
 
-    override fun deleteTreeWithRetry(root: Path, attempts: Int, sleepMs: Long): Boolean {
+    override fun deleteTreeWithRetry(
+        root: Path,
+        attempts: Int,
+        sleepMs: Long,
+    ): Boolean {
         val targets = walk(root)
         targets.sortedByDescending { it.toString().length }.forEach {
             deleteIfExists(it)

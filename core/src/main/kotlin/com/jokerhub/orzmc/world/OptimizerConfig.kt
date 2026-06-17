@@ -11,13 +11,13 @@ data class OptimizerRequest(
     val progress: ProgressOptions = ProgressOptions(),
     val runtime: RuntimeOptions = RuntimeOptions(),
     val hooks: Hooks = Hooks(),
-    val io: IOOptions = IOOptions()
+    val io: IOOptions = IOOptions(),
 )
 
 data class FilterOptions(
     val inhabitedThresholdSeconds: Long = 300,
     val removeUnknown: Boolean = false,
-    val strict: Boolean = false
+    val strict: Boolean = false,
 )
 
 data class OutputOptions(
@@ -25,33 +25,33 @@ data class OutputOptions(
     val zipOutput: Boolean = false,
     val force: Boolean = false,
     val copyMisc: Boolean = true,
-    val dryRun: Boolean = false
+    val dryRun: Boolean = false,
 )
 
 data class ProgressOptions(
     val interval: Long = 1000,
     val intervalMs: Long = 0,
-    val sink: ProgressSink = NoopProgressSink
+    val sink: ProgressSink = NoopProgressSink,
 )
 
 data class RuntimeOptions(
-    val parallelism: Int = 1
+    val parallelism: Int = 1,
 )
 
 data class Hooks(
     val onError: ((OptimizeError) -> Unit)? = null,
     val reportSink: ReportSink? = null,
-    val metricsSink: MetricsSink? = null
+    val metricsSink: MetricsSink? = null,
 )
 
 data class IOOptions(
     val fs: FileSystem = RealFileSystem,
-    val ioFactory: McaIOFactory = DefaultMcaIOFactory()
+    val ioFactory: McaIOFactory = DefaultMcaIOFactory(),
 )
 
 class OptimizerRequestBuilder internal constructor(
     private val input: Path,
-    var output: Path? = null
+    var output: Path? = null,
 ) {
     var filter: FilterOptions = FilterOptions()
     var outputOptions: OutputOptions = OutputOptions()
@@ -123,14 +123,16 @@ class OptimizerRequestBuilder internal constructor(
     var progressSink: Any?
         get() = progress.sink
         set(value) {
-            progress = progress.copy(
-                sink = when (value) {
-                    null -> progress.sink
-                    is ProgressSink -> value
-                    is Function1<*, *> -> CallbackProgressSink(value as (ProgressEvent) -> Unit)
-                    else -> progress.sink
-                }
-            )
+            progress =
+                progress.copy(
+                    sink =
+                        when (value) {
+                            null -> progress.sink
+                            is ProgressSink -> value
+                            is Function1<*, *> -> CallbackProgressSink(value as (ProgressEvent) -> Unit)
+                            else -> progress.sink
+                        },
+                )
         }
 
     fun progressSink(callback: (ProgressEvent) -> Unit) {
@@ -156,29 +158,37 @@ class OptimizerRequestBuilder internal constructor(
     var reportSink: Any?
         get() = hooks.reportSink
         set(value) {
-            hooks = hooks.copy(
-                reportSink = when (value) {
-                    null -> null
-                    is ReportSink -> value
-                    is Path -> {
-                        val path = normalizeReportPath(value, reportFormat)
-                        FileReportSink(path, reportFormat ?: inferReportFormat(path))
-                    }
-                    is String -> {
-                        val path = normalizeReportPath(Paths.get(value), reportFormat)
-                        FileReportSink(path, reportFormat ?: inferReportFormat(path))
-                    }
-                    else -> hooks.reportSink
-                }
-            )
+            hooks =
+                hooks.copy(
+                    reportSink =
+                        when (value) {
+                            null -> null
+                            is ReportSink -> value
+                            is Path -> {
+                                val path = normalizeReportPath(value, reportFormat)
+                                FileReportSink(path, reportFormat ?: inferReportFormat(path))
+                            }
+                            is String -> {
+                                val path = normalizeReportPath(Paths.get(value), reportFormat)
+                                FileReportSink(path, reportFormat ?: inferReportFormat(path))
+                            }
+                            else -> hooks.reportSink
+                        },
+                )
         }
 
-    fun reportSink(path: String, format: String? = null) {
+    fun reportSink(
+        path: String,
+        format: String? = null,
+    ) {
         reportFormat = format
         reportSink = path
     }
 
-    fun reportSink(path: Path, format: String? = null) {
+    fun reportSink(
+        path: Path,
+        format: String? = null,
+    ) {
         reportFormat = format
         reportSink = path
     }
@@ -237,8 +247,7 @@ class OptimizerRequestBuilder internal constructor(
         io = builder.build()
     }
 
-    fun build(): OptimizerRequest =
-        OptimizerRequest(input, output, filter, outputOptions, progress, runtime, hooks, io)
+    fun build(): OptimizerRequest = OptimizerRequest(input, output, filter, outputOptions, progress, runtime, hooks, io)
 }
 
 private fun inferReportFormat(path: Path): String {
@@ -246,15 +255,19 @@ private fun inferReportFormat(path: Path): String {
     return if (name.endsWith(".csv", ignoreCase = true)) "csv" else "json"
 }
 
-private fun normalizeReportPath(path: Path, format: String?): Path {
+private fun normalizeReportPath(
+    path: Path,
+    format: String?,
+): Path {
     val name = path.fileName?.toString() ?: ""
     val hasExt = name.contains(".")
     if (hasExt) return path
-    val ext = when (format?.lowercase()) {
-        "csv" -> "csv"
-        "json" -> "json"
-        else -> "json"
-    }
+    val ext =
+        when (format?.lowercase()) {
+            "csv" -> "csv"
+            "json" -> "json"
+            else -> "json"
+        }
     val parent = path.parent
     val fileName = "$name.$ext"
     return if (parent == null) Paths.get(fileName) else parent.resolve(fileName)
@@ -264,6 +277,7 @@ class FilterOptionsBuilder internal constructor(base: FilterOptions) {
     var inhabitedThresholdSeconds: Long = base.inhabitedThresholdSeconds
     var removeUnknown: Boolean = base.removeUnknown
     var strict: Boolean = base.strict
+
     fun build(): FilterOptions = FilterOptions(inhabitedThresholdSeconds, removeUnknown, strict)
 }
 
@@ -273,6 +287,7 @@ class OutputOptionsBuilder internal constructor(base: OutputOptions) {
     var force: Boolean = base.force
     var copyMisc: Boolean = base.copyMisc
     var dryRun: Boolean = base.dryRun
+
     fun build(): OutputOptions = OutputOptions(inPlace, zipOutput, force, copyMisc, dryRun)
 }
 
@@ -280,14 +295,17 @@ class ProgressOptionsBuilder internal constructor(base: ProgressOptions) {
     var interval: Long = base.interval
     var intervalMs: Long = base.intervalMs
     var sink: ProgressSink = base.sink
+
     fun onProgress(callback: (ProgressEvent) -> Unit) {
         sink = CallbackProgressSink(callback)
     }
+
     fun build(): ProgressOptions = ProgressOptions(interval, intervalMs, sink)
 }
 
 class RuntimeOptionsBuilder internal constructor(base: RuntimeOptions) {
     var parallelism: Int = base.parallelism
+
     fun build(): RuntimeOptions = RuntimeOptions(parallelism)
 }
 
@@ -295,11 +313,13 @@ class HooksBuilder internal constructor(base: Hooks) {
     var onError: ((OptimizeError) -> Unit)? = base.onError
     var reportSink: ReportSink? = base.reportSink
     var metricsSink: MetricsSink? = base.metricsSink
+
     fun build(): Hooks = Hooks(onError, reportSink, metricsSink)
 }
 
 class IOOptionsBuilder internal constructor(base: IOOptions) {
     var fs: FileSystem = base.fs
     var ioFactory: McaIOFactory = base.ioFactory
+
     fun build(): IOOptions = IOOptions(fs, ioFactory)
 }

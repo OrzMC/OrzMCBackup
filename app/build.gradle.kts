@@ -2,21 +2,35 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-    kotlin("jvm")
+    alias(libs.plugins.kotlin.jvm)
     application
-    id("com.gradleup.shadow")
+    alias(libs.plugins.shadow)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.detekt)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    config.setFrom(rootProject.file("detekt.yml"))
+}
+
+tasks.withType<io.gitlab.arturbosch.detekt.Detekt>().configureEach {
+    // detekt 1.23.x requires JDK ≤ 21 for type-resolution compilation.
+    // On JDK 25+ the task is skipped locally; CI runs JDK 21 so it always works.
+    val jvmVersion = System.getProperty("java.version")?.substringBefore(".")?.toIntOrNull() ?: 0
+    onlyIf("detekt requires JDK ≤ 21 (current: $jvmVersion)") { jvmVersion <= 21 }
 }
 
 // Use current JDK; no enforced toolchain to ease local builds
 
 dependencies {
     implementation(project(":core"))
-    implementation("info.picocli:picocli:4.7.7")
+    implementation(libs.picocli)
     testImplementation(testFixtures(project(":core")))
-    testImplementation("org.junit.jupiter:junit-jupiter-api:6.1.0")
-    testImplementation("org.junit.jupiter:junit-jupiter-params:6.1.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:6.1.0")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher:6.1.0")
+    testImplementation(libs.junit.jupiter.api)
+    testImplementation(libs.junit.jupiter.params)
+    testRuntimeOnly(libs.junit.jupiter.engine)
+    testRuntimeOnly(libs.junit.platform.launcher)
 }
 
 application {
@@ -42,14 +56,15 @@ tasks.test {
     useJUnitPlatform()
 }
 
-
 tasks.withType<Jar>().named("shadowJar") {
     archiveBaseName.set("backup")
     archiveClassifier.set("")
     manifest {
-        attributes(mapOf(
-            "Main-Class" to "com.jokerhub.orzmc.cli.Main",
-            "Implementation-Version" to project.version.toString()
-        ))
+        attributes(
+            mapOf(
+                "Main-Class" to "com.jokerhub.orzmc.cli.Main",
+                "Implementation-Version" to project.version.toString(),
+            ),
+        )
     }
 }

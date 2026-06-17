@@ -1,0 +1,20 @@
+# pre-commit hooks
+# Install: pip install pre-commit && pre-commit install
+# Update:  pre-commit autoupdate
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+        args: [--maxkb=2048]
+
+  - repo: https://github.com/jlleitschuh/ktlint-pre-commit-hook
+    rev: v1.4.1
+    hooks:
+      - id: ktlint
+        args: ["--format"]

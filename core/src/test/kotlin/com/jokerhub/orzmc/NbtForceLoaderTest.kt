@@ -10,7 +10,6 @@ import java.io.DataOutputStream
 import java.util.zip.GZIPOutputStream
 
 class NbtForceLoaderTest {
-
     /** Helper: write a UTF string as NBT string prefix (short length + bytes) */
     private fun DataOutputStream.writeNbtString(s: String) {
         val bytes = s.toByteArray(Charsets.UTF_8)
@@ -30,14 +29,19 @@ class NbtForceLoaderTest {
     }
 
     /** Write a named TAG_Compound entry (for use inside a parent compound) */
-    private fun DataOutputStream.writeNamedCompound(name: String, vararg entries: Pair<String, Pair<Byte, DataOutputStream.() -> Unit>>) {
+    private fun DataOutputStream.writeNamedCompound(
+        name: String,
+        vararg entries: Pair<String, Pair<Byte, DataOutputStream.() -> Unit>>,
+    ) {
         writeByte(0x0A) // TAG_Compound tag type
         writeNbtString(name)
         writeCompoundEntries(*entries)
     }
 
     /** Write compound entries without a wrapping tag header — for list element compounds */
-    private fun DataOutputStream.writeCompoundEntries(vararg entries: Pair<String, Pair<Byte, DataOutputStream.() -> Unit>>) {
+    private fun DataOutputStream.writeCompoundEntries(
+        vararg entries: Pair<String, Pair<Byte, DataOutputStream.() -> Unit>>,
+    ) {
         for (entry in entries) {
             val name = entry.first
             val (tagType, payload) = entry.second
@@ -50,26 +54,30 @@ class NbtForceLoaderTest {
 
     @Test
     fun `parse legacy Forced long array format`() {
-        val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
-            writeNbtString("") // root name
-            writeByte(0x0A) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(0x0C) // TAG_Long_Array "Forced"
-            writeNbtString("Forced")
-            writeInt(4) // 4 longs = 2 chunk positions
-            writeLong(1) // chunk x=1
-            writeLong(2) // chunk z=2
-            writeLong(10) // chunk x=10
-            writeLong(20) // chunk z=20
-            writeByte(0) // TAG_End (data)
-            writeByte(0) // TAG_End (root)
-        }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("") // root name
+                writeByte(0x0A) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(0x0C) // TAG_Long_Array "Forced"
+                writeNbtString("Forced")
+                writeInt(4) // 4 longs = 2 chunk positions
+                writeLong(1) // chunk x=1
+                writeLong(2) // chunk z=2
+                writeLong(10) // chunk x=10
+                writeLong(20) // chunk z=20
+                writeByte(0) // TAG_End (data)
+                writeByte(0) // TAG_End (root)
+            }
 
-        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunks", ".dat").apply {
-            writeBytes(data)
-            deleteOnExit()
-        })
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunks", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
+            )
 
         assertEquals(2, result.size, "should parse 2 forced chunks")
         assertTrue(result.contains(1 to 2), "should contain (1, 2)")
@@ -84,42 +92,64 @@ class NbtForceLoaderTest {
         val tagList = 0x09
         val tagEnd = 0x00
 
-        val data = buildChunksDat {
-            writeByte(tagCompound) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(tagCompound) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(tagList) // TAG_List "tickets"
-            writeNbtString("tickets")
-            writeByte(tagCompound) // element type: TAG_Compound
-            writeInt(3) // 3 tickets
+        val data =
+            buildChunksDat {
+                writeByte(tagCompound) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(tagCompound) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(tagList) // TAG_List "tickets"
+                writeNbtString("tickets")
+                writeByte(tagCompound) // element type: TAG_Compound
+                writeInt(3) // 3 tickets
 
-            // Ticket 1: forced chunk (3, 4)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:forced") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(3); writeInt(4) })
+                // Ticket 1: forced chunk (3, 4)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(3)
+                            writeInt(4)
+                        }
+                    ),
+                )
+
+                // Ticket 2: not forced (different type)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:other") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(5)
+                            writeInt(6)
+                        }
+                    ),
+                )
+
+                // Ticket 3: forced chunk (5, 6)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(5)
+                            writeInt(6)
+                        }
+                    ),
+                )
+
+                writeByte(tagEnd) // TAG_End (data)
+                writeByte(tagEnd) // TAG_End (root)
+            }
+
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunks", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
             )
-
-            // Ticket 2: not forced (different type)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:other") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(5); writeInt(6) })
-            )
-
-            // Ticket 3: forced chunk (5, 6)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:forced") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(5); writeInt(6) })
-            )
-
-            writeByte(tagEnd) // TAG_End (data)
-            writeByte(tagEnd) // TAG_End (root)
-        }
-
-        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunks", ".dat").apply {
-            writeBytes(data)
-            deleteOnExit()
-        })
 
         assertTrue(result.contains(3 to 4), "should contain forced ticket (3, 4)")
         assertTrue(result.contains(5 to 6), "should contain forced ticket (5, 6)")
@@ -132,65 +162,74 @@ class NbtForceLoaderTest {
             NbtForceLoader.parse(
                 java.io.File.createTempFile("empty", ".dat").apply {
                     deleteOnExit()
-                }
+                },
             )
         }
     }
 
     @Test
     fun `file with no data compound returns empty list`() {
-        val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(0x0A) // TAG_Compound "other"
-            writeNbtString("other")
-            writeByte(0) // TAG_End (other)
-            writeByte(0) // TAG_End (root)
-        }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(0x0A) // TAG_Compound "other"
+                writeNbtString("other")
+                writeByte(0) // TAG_End (other)
+                writeByte(0) // TAG_End (root)
+            }
 
-        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunks", ".dat").apply {
-            writeBytes(data)
-            deleteOnExit()
-        })
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunks", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
+            )
 
         assertTrue(result.isEmpty(), "no data compound should return empty list")
     }
 
     @Test
     fun `file with empty Forced array returns empty list`() {
-        val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(0x0A) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(0x0C) // TAG_Long_Array "Forced"
-            writeNbtString("Forced")
-            writeInt(0) // empty long array
-            writeByte(0) // TAG_End (data)
-            writeByte(0) // TAG_End (root)
-        }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(0x0A) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(0x0C) // TAG_Long_Array "Forced"
+                writeNbtString("Forced")
+                writeInt(0) // empty long array
+                writeByte(0) // TAG_End (data)
+                writeByte(0) // TAG_End (root)
+            }
 
-        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunks", ".dat").apply {
-            writeBytes(data)
-            deleteOnExit()
-        })
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunks", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
+            )
 
         assertTrue(result.isEmpty(), "empty forced array should return empty list")
     }
 
     @Test
     fun `oversized byte array is rejected with custom limit`() {
-        val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(0x0A) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(0x07) // TAG_Byte_Array "oversized"
-            writeNbtString("oversized")
-            writeInt(101) // exceeds custom maxArraySize=100
-            writeByte(0) // TAG_End (data)
-            writeByte(0) // TAG_End (root)
-        }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(0x0A) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(0x07) // TAG_Byte_Array "oversized"
+                writeNbtString("oversized")
+                writeInt(101) // exceeds custom maxArraySize=100
+                writeByte(0) // TAG_End (data)
+                writeByte(0) // TAG_End (root)
+            }
         assertThrows(
             IllegalArgumentException::class.java,
             {
@@ -199,55 +238,77 @@ class NbtForceLoaderTest {
                         writeBytes(data)
                         deleteOnExit()
                     },
-                    maxArraySize = 100
+                    maxArraySize = 100,
                 )
             },
-            "oversized byte array should be rejected"
+            "oversized byte array should be rejected",
         )
     }
 
     @Test
     fun `parse chunk_tickets_dat with tickets format`() {
-        val data = buildChunksDat {
-            val tagString: Byte = 0x08
-            val tagIntArray: Byte = 0x0B
-            val tagCompound: Byte = 0x0A
-            val tagList: Byte = 0x09
-            val tagEnd: Byte = 0x00
+        val data =
+            buildChunksDat {
+                val tagString: Byte = 0x08
+                val tagIntArray: Byte = 0x0B
+                val tagCompound: Byte = 0x0A
+                val tagList: Byte = 0x09
+                val tagEnd: Byte = 0x00
 
-            writeByte(tagCompound.toInt()) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(tagCompound.toInt()) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(tagList.toInt()) // TAG_List "tickets"
-            writeNbtString("tickets")
-            writeByte(tagCompound.toInt()) // element type
-            writeInt(3) // 3 tickets
+                writeByte(tagCompound.toInt()) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(tagCompound.toInt()) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(tagList.toInt()) // TAG_List "tickets"
+                writeNbtString("tickets")
+                writeByte(tagCompound.toInt()) // element type
+                writeInt(3) // 3 tickets
 
-            // Ticket 1: forced (100, 200)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:forced") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(100); writeInt(200) })
+                // Ticket 1: forced (100, 200)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(100)
+                            writeInt(200)
+                        }
+                    ),
+                )
+                // Ticket 2: not forced (should be skipped)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:other") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(300)
+                            writeInt(400)
+                        }
+                    ),
+                )
+                // Ticket 3: forced (500, 600)
+                writeCompoundEntries(
+                    "type" to (tagString to { writeNbtString("minecraft:forced") }),
+                    "chunk_pos" to (
+                        tagIntArray to {
+                            writeInt(2)
+                            writeInt(500)
+                            writeInt(600)
+                        }
+                    ),
+                )
+
+                writeByte(tagEnd.toInt()) // TAG_End (data)
+                writeByte(tagEnd.toInt()) // TAG_End (root)
+            }
+
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunk_tickets", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
             )
-            // Ticket 2: not forced (should be skipped)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:other") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(300); writeInt(400) })
-            )
-            // Ticket 3: forced (500, 600)
-            writeCompoundEntries(
-                "type" to (tagString to { writeNbtString("minecraft:forced") }),
-                "chunk_pos" to (tagIntArray to { writeInt(2); writeInt(500); writeInt(600) })
-            )
-
-            writeByte(tagEnd.toInt()) // TAG_End (data)
-            writeByte(tagEnd.toInt()) // TAG_End (root)
-        }
-
-        val result = NbtForceLoader.parse(java.io.File.createTempFile("chunk_tickets", ".dat").apply {
-            writeBytes(data)
-            deleteOnExit()
-        })
 
         assertTrue(result.contains(100 to 200), "should contain forced ticket (100, 200)")
         assertTrue(result.contains(500 to 600), "should contain forced ticket (500, 600)")
@@ -257,18 +318,19 @@ class NbtForceLoaderTest {
     @Test
     fun `oversized list is rejected with custom limit`() {
         val maxListLength = 5
-        val data = buildChunksDat {
-            writeByte(0x0A) // TAG_Compound (root)
-            writeNbtString("")
-            writeByte(0x0A) // TAG_Compound "data"
-            writeNbtString("data")
-            writeByte(0x09) // TAG_List "tickets"
-            writeNbtString("tickets")
-            writeByte(0x0A) // element type: TAG_Compound
-            writeInt(maxListLength + 1) // exceeds custom limit
-            writeByte(0) // TAG_End (data)
-            writeByte(0) // TAG_End (root)
-        }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(0x0A) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(0x09) // TAG_List "tickets"
+                writeNbtString("tickets")
+                writeByte(0x0A) // element type: TAG_Compound
+                writeInt(maxListLength + 1) // exceeds custom limit
+                writeByte(0) // TAG_End (data)
+                writeByte(0) // TAG_End (root)
+            }
         assertThrows(
             IllegalArgumentException::class.java,
             {
@@ -277,10 +339,10 @@ class NbtForceLoaderTest {
                         writeBytes(data)
                         deleteOnExit()
                     },
-                    maxListLength = maxListLength
+                    maxListLength = maxListLength,
                 )
             },
-            "oversized list should be rejected"
+            "oversized list should be rejected",
         )
     }
 }

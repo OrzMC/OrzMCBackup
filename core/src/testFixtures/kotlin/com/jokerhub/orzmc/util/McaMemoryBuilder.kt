@@ -28,7 +28,10 @@ object McaMemoryBuilder {
         return out.toByteArray()
     }
 
-    private fun compress(kind: CompressionKind, data: ByteArray): Pair<Int, ByteArray> {
+    private fun compress(
+        kind: CompressionKind,
+        data: ByteArray,
+    ): Pair<Int, ByteArray> {
         return when (kind) {
             CompressionKind.RAW -> 3 to data
             CompressionKind.ZLIB -> {
@@ -68,7 +71,11 @@ object McaMemoryBuilder {
         }
     }
 
-    fun buildSingleEntryMca(index: Int, inhabited: Long, kind: CompressionKind): ByteArray {
+    fun buildSingleEntryMca(
+        index: Int,
+        inhabited: Long,
+        kind: CompressionKind,
+    ): ByteArray {
         val payload = inhabitedTag(inhabited)
         val (method, body) = compress(kind, payload)
         val bos = ByteArrayOutputStream()
@@ -77,7 +84,12 @@ object McaMemoryBuilder {
         val time = ByteArray(4096)
         val bbTime = ByteBuffer.wrap(time).order(ByteOrder.BIG_ENDIAN)
         var offsetBytes = 8192
-        fun writeOne(idx: Int, m: Int, b: ByteArray) {
+
+        fun writeOne(
+            idx: Int,
+            m: Int,
+            b: ByteArray,
+        ) {
             val lenBuf = ByteBuffer.allocate(4).order(ByteOrder.BIG_ENDIAN).putInt(1 + b.size).array()
             bos.write(lenBuf)
             bos.write(byteArrayOf(m.toByte()))

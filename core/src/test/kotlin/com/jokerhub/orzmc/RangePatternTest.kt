@@ -8,7 +8,6 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 class RangePatternTest {
-
     @Test
     fun `normal range keeps matching chunks`() {
         val pattern = RangePattern(0, 0, 10, 10)
@@ -17,9 +16,10 @@ class RangePatternTest {
         assertTrue(matching > 0, "should match chunks within [0..10] range")
         // r.0.0.mca with 676 entries has chunks from global (0,0) to (31,31),
         // so only the first 11x11=121 chunks are in range
-        val expected = (0..10).sumOf { z ->
-            (0..10).count { x -> entries.any { e -> e.globalX() == x && e.globalZ() == z } }
-        }
+        val expected =
+            (0..10).sumOf { z ->
+                (0..10).count { x -> entries.any { e -> e.globalX() == x && e.globalZ() == z } }
+            }
         // Just verify there's a reasonable number of matches
         assertTrue(matching >= 100, "expected at least 100 chunks in 11x11 range, got $matching")
     }
@@ -28,9 +28,10 @@ class RangePatternTest {
     fun `inverted range is normalized`() {
         val pattern1 = RangePattern(10, 10, 0, 0)
         val pattern2 = RangePattern(0, 0, 10, 10)
-        val entry = McaReader.open(TestPaths.worldRegion("r.0.0.mca").toString()).use {
-            it.entries().first { e -> e.globalX() == 5 && e.globalZ() == 5 }
-        }
+        val entry =
+            McaReader.open(TestPaths.worldRegion("r.0.0.mca").toString()).use {
+                it.entries().first { e -> e.globalX() == 5 && e.globalZ() == 5 }
+            }
         assertEquals(pattern1.matches(entry), pattern2.matches(entry))
     }
 

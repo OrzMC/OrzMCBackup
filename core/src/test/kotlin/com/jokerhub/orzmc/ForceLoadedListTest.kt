@@ -2,8 +2,8 @@ package com.jokerhub.orzmc
 
 import com.jokerhub.orzmc.mca.McaReader
 import com.jokerhub.orzmc.patterns.ListPattern
-import com.jokerhub.orzmc.world.NbtForceLoader
 import com.jokerhub.orzmc.util.TestPaths
+import com.jokerhub.orzmc.world.NbtForceLoader
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -34,9 +34,10 @@ class ForceLoadedListTest {
         val ticketsFile = TestPaths.world26_1Dimension("overworld", "data/minecraft/chunk_tickets.dat")
         val forced = NbtForceLoader.parse(ticketsFile.toFile())
         val pattern = ListPattern(forced.map { it.first to it.second })
-        val entries = McaReader.open(
-            TestPaths.world26_1Dimension("overworld", "region/r.0.0.mca").toString()
-        ).use { it.entries() }
+        val entries =
+            McaReader.open(
+                TestPaths.world26_1Dimension("overworld", "region/r.0.0.mca").toString(),
+            ).use { it.entries() }
         val anyMatch = entries.any { pattern.matches(it) }
         assertTrue(anyMatch, "expected at least one entry to match 26.1+ forced chunks")
     }

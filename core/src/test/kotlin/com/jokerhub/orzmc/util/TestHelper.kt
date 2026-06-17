@@ -6,7 +6,12 @@ import com.jokerhub.orzmc.world.McaIOFactory
 import java.nio.file.Path
 
 object TestHelper {
-    fun countRemoved(fs: FileSystem, dims: List<Path>, ioFactory: McaIOFactory, pattern: ChunkPattern): Long {
+    fun countRemoved(
+        fs: FileSystem,
+        dims: List<Path>,
+        ioFactory: McaIOFactory,
+        pattern: ChunkPattern,
+    ): Long {
         var removed = 0L
         dims.forEach { dim ->
             val regionDir = dim.resolve("region")
@@ -15,14 +20,21 @@ object TestHelper {
                 try {
                     removed += r.entries().count { e -> !pattern.matches(e) }
                 } finally {
-                    try { r.close() } catch (_: Exception) {}
+                    try {
+                        r.close()
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
         return removed
     }
 
-    fun countEntries(fs: FileSystem, dims: List<Path>, ioFactory: McaIOFactory): Long {
+    fun countEntries(
+        fs: FileSystem,
+        dims: List<Path>,
+        ioFactory: McaIOFactory,
+    ): Long {
         var total = 0L
         dims.forEach { dim ->
             val regionDir = dim.resolve("region")
@@ -31,7 +43,10 @@ object TestHelper {
                 try {
                     total += r.entries().size
                 } finally {
-                    try { r.close() } catch (_: Exception) {}
+                    try {
+                        r.close()
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }

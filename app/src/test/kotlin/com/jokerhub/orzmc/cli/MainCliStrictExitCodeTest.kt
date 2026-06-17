@@ -19,14 +19,17 @@ class MainCliStrictExitCodeTest {
     @Test
     fun `strict mode returns non-zero exit`() {
         val (input, out) = createWorldWithBadMca()
-        val exit = CommandLine(Main()).execute(
-            input.toString(),
-            out.toString(),
-            "-t", "0",
-            "--progress-mode", "Off",
-            "--force",
-            "--strict"
-        )
+        val exit =
+            CommandLine(Main()).execute(
+                input.toString(),
+                out.toString(),
+                "-t",
+                "0",
+                "--progress-mode",
+                "Off",
+                "--force",
+                "--strict",
+            )
         assertTrue(exit != 0)
         Cleaner.deleteTreeWithRetry(out, 5, 10)
         Cleaner.deleteTreeWithRetry(input, 5, 10)
@@ -36,15 +39,16 @@ class MainCliStrictExitCodeTest {
     fun `non-strict mode returns zero with report errors`() {
         val (input, out) = createWorldWithBadMca()
         val report = Files.createTempFile("cli-report-", ".json")
-        val exit = CommandLine(Main()).execute(
-            input.toString(),
-            out.toString(),
-            "-t", "0",
-            "--progress-mode", "Off",
-            "--force",
-            "--report-file", report.toString(),
-            "--report-format", "json"
-        )
+        val exit =
+            CommandLine(Main()).execute(
+                input.toString(),
+                out.toString(),
+                "-t", "0",
+                "--progress-mode", "Off",
+                "--force",
+                "--report-file", report.toString(),
+                "--report-format", "json",
+            )
         assertTrue(exit == 0)
         val content = String(Files.readAllBytes(report), Charsets.UTF_8)
         assertTrue(content.contains("\"errors\":["))

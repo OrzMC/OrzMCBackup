@@ -1,0 +1,26 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 120
+
+[*.{kt,kts}]
+indent_size = 4
+continuation_indent_size = 8
+
+[*.{yml,yaml}]
+indent_size = 2
+
+[*.kt]
+# CLI Main.kt uses many classes from com.jokerhub.orzmc.world and picocli.CommandLine
+# Wildcard imports are practical for these well-known packages
+ktlint_standard_no-wildcard-imports = disabled
+
+[*.md]
+trim_trailing_whitespace = false
+max_line_length = off

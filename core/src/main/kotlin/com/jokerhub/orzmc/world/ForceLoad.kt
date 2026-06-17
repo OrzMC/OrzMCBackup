@@ -14,22 +14,31 @@ import java.nio.file.Path
  *  - `data.tickets[].chunk_pos` (IntArray[2]) — modern format with `minecraft:forced` type
  */
 object ForceLoad {
-    private val FILE_PATHS = listOf(
-        "data/minecraft/chunk_tickets.dat",
-        "data/chunks.dat"
-    )
+    private val FILE_PATHS =
+        listOf(
+            "data/minecraft/chunk_tickets.dat",
+            "data/chunks.dat",
+        )
 
     /** Parse force-loaded chunk data in [dimension], returning global (x, z) coordinate pairs. */
-    fun parse(dimension: Path, strict: Boolean): List<Pair<Int, Int>> {
+    fun parse(
+        dimension: Path,
+        strict: Boolean,
+    ): List<Pair<Int, Int>> {
         for (relPath in FILE_PATHS) {
             val f = dimension.resolve(relPath).toFile()
             if (f.isFile) {
                 return try {
                     NbtForceLoader.parse(f)
                 } catch (e: Exception) {
-                    if (strict) throw ForceLoadedParseException(
-                        "Failed to parse force-loaded chunk list: ${f}", e
-                    ) else emptyList()
+                    if (strict) {
+                        throw ForceLoadedParseException(
+                            "Failed to parse force-loaded chunk list: $f",
+                            e,
+                        )
+                    } else {
+                        emptyList()
+                    }
                 }
             }
         }

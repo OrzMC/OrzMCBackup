@@ -16,7 +16,12 @@ import java.util.regex.Pattern
  * @param xPos region X coordinate (derived from filename)
  * @param zPos region Z coordinate (derived from filename)
  */
-class McaReader(private val file: RandomAccess, private val path: String, val xPos: Int, val zPos: Int) : AutoCloseable {
+class McaReader(
+    private val file: RandomAccess,
+    private val path: String,
+    val xPos: Int,
+    val zPos: Int,
+) : AutoCloseable {
     private var offsets: IntArray? = null
     private var sizes: IntArray? = null
     private var timestamps: IntArray? = null
@@ -36,7 +41,10 @@ class McaReader(private val file: RandomAccess, private val path: String, val xP
         }
 
         /** Open a region file from in-memory bytes. Useful for testing. */
-        fun openFromBytes(path: String, bytes: ByteArray): McaReader {
+        fun openFromBytes(
+            path: String,
+            bytes: ByteArray,
+        ): McaReader {
             val m = FILENAME_RE.matcher(path)
             require(m.find()) { "invalid mca filename: $path" }
             val x = m.group(1).toInt()
@@ -95,8 +103,8 @@ class McaReader(private val file: RandomAccess, private val path: String, val xP
                     index = i,
                     modified = t,
                     regionX = xPos,
-                    regionZ = zPos
-                )
+                    regionZ = zPos,
+                ),
             )
         }
         return out

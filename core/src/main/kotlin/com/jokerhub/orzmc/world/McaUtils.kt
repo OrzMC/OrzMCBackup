@@ -1,11 +1,13 @@
 package com.jokerhub.orzmc.world
 
-import com.jokerhub.orzmc.mca.McaReader
 import java.nio.file.Path
 
 /** Utilities for inspecting MCA region files. */
 object McaUtils {
-    fun isValidMca(fs: FileSystem, path: Path): Boolean {
+    fun isValidMca(
+        fs: FileSystem,
+        path: Path,
+    ): Boolean {
         return try {
             fs.size(path) >= 8192
         } catch (_: Exception) {
@@ -17,7 +19,7 @@ object McaUtils {
         fs: FileSystem,
         ioFactory: McaIOFactory,
         dims: List<Path>,
-        onError: ((Path, String, String) -> Unit)? = null
+        onError: ((Path, String, String) -> Unit)? = null,
     ): Long {
         var total = 0L
         for (dim in dims) {

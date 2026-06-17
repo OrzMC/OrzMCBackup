@@ -1,10 +1,10 @@
 package com.jokerhub.orzmc
 
+import com.jokerhub.orzmc.patterns.InhabitedTimePattern
 import com.jokerhub.orzmc.util.CompressionKind
 import com.jokerhub.orzmc.util.McaMemoryBuilder
-import com.jokerhub.orzmc.world.*
 import com.jokerhub.orzmc.util.TestHelper
-import com.jokerhub.orzmc.patterns.InhabitedTimePattern
+import com.jokerhub.orzmc.world.*
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -20,35 +20,39 @@ class MemoryParallelE2ETest {
         val dim1 = world.resolve("DIM1")
         fs.createDirectories(dim1)
         fs.createDirectories(dim1.resolve("region"))
-        val r00 = McaMemoryBuilder.buildMca(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 0, inhabited = 500, kind = CompressionKind.RAW),
-                McaMemoryBuilder.MemChunk(index = 1, inhabited = 3000, kind = CompressionKind.ZLIB)
+        val r00 =
+            McaMemoryBuilder.buildMca(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 0, inhabited = 500, kind = CompressionKind.RAW),
+                    McaMemoryBuilder.MemChunk(index = 1, inhabited = 3000, kind = CompressionKind.ZLIB),
+                ),
             )
-        )
-        val r10 = McaMemoryBuilder.buildMca(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 10, inhabited = 1000, kind = CompressionKind.LZ4),
-                McaMemoryBuilder.MemChunk(index = 11, inhabited = 100, kind = CompressionKind.RAW)
+        val r10 =
+            McaMemoryBuilder.buildMca(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 10, inhabited = 1000, kind = CompressionKind.LZ4),
+                    McaMemoryBuilder.MemChunk(index = 11, inhabited = 100, kind = CompressionKind.RAW),
+                ),
             )
-        )
         fs.write(world.resolve("region").resolve("r.0.0.mca"), r00)
         fs.write(world.resolve("region").resolve("r.1.0.mca"), r10)
-        val d1r00 = McaMemoryBuilder.buildMca(
-            listOf(
-                McaMemoryBuilder.MemChunk(index = 2, inhabited = 4000, kind = CompressionKind.ZLIB),
-                McaMemoryBuilder.MemChunk(index = 3, inhabited = 50, kind = CompressionKind.RAW)
+        val d1r00 =
+            McaMemoryBuilder.buildMca(
+                listOf(
+                    McaMemoryBuilder.MemChunk(index = 2, inhabited = 4000, kind = CompressionKind.ZLIB),
+                    McaMemoryBuilder.MemChunk(index = 3, inhabited = 50, kind = CompressionKind.RAW),
+                ),
             )
-        )
         fs.write(dim1.resolve("region").resolve("r.0.0.mca"), d1r00)
         val out = java.nio.file.Paths.get("/mem/out")
-        val request = OptimizerRequest(
-            input = world,
-            output = out,
-            filter = FilterOptions(inhabitedThresholdSeconds = 100, removeUnknown = true),
-            runtime = RuntimeOptions(parallelism = 3),
-            io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory())
-        )
+        val request =
+            OptimizerRequest(
+                input = world,
+                output = out,
+                filter = FilterOptions(inhabitedThresholdSeconds = 100, removeUnknown = true),
+                runtime = RuntimeOptions(parallelism = 3),
+                io = IOOptions(fs = fs, ioFactory = MemoryMcaIOFactory()),
+            )
         val report = Optimizer.run(request)
         val totalEntries = TestHelper.countEntries(fs, listOf(world, dim1), MemoryMcaIOFactory())
         val ticks = request.filter.inhabitedThresholdSeconds * 20

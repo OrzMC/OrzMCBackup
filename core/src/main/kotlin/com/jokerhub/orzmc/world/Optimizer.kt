@@ -28,7 +28,7 @@ internal data class DimensionContext(
     val progressSink: ProgressSink,
     val ioFactory: McaIOFactory,
     val parallelism: Int,
-    val dryRun: Boolean = false
+    val dryRun: Boolean = false,
 )
 
 /**
@@ -43,17 +43,26 @@ object Optimizer {
     fun run(request: OptimizerRequest): OptimizeReport = DefaultOptimizer.run(request)
 
     @JvmStatic
-    fun run(input: Path, output: Path? = null, block: OptimizerRequestBuilder.() -> Unit = {}): OptimizeReport =
-        DefaultOptimizer.run(input, output, block)
+    fun run(
+        input: Path,
+        output: Path? = null,
+        block: OptimizerRequestBuilder.() -> Unit = {},
+    ): OptimizeReport = DefaultOptimizer.run(input, output, block)
 }
 
 /**
  * Default [Optimizer] implementation.
  */
 object DefaultOptimizer : OptimizerEngine {
-    private fun isDimensionDir(fs: FileSystem, path: Path): Boolean = fs.isDirectory(path.resolve("region"))
+    private fun isDimensionDir(
+        fs: FileSystem,
+        path: Path,
+    ): Boolean = fs.isDirectory(path.resolve("region"))
 
-    private fun discoverDimensions(fs: FileSystem, root: Path): List<Path> {
+    private fun discoverDimensions(
+        fs: FileSystem,
+        root: Path,
+    ): List<Path> {
         val tasks = mutableListOf<Path>()
         if (isDimensionDir(fs, root)) tasks.add(root)
         fs.walk(root).filter { it != root && fs.isDirectory(it) && isDimensionDir(fs, it) }
@@ -68,7 +77,11 @@ object DefaultOptimizer : OptimizerEngine {
         val metrics = request.hooks.metricsSink ?: NoopMetricsSink()
         val progressSink = request.progress.sink
 
-        fun record(path: Path, kind: String, msg: String) {
+        fun record(
+            path: Path,
+            kind: String,
+            msg: String,
+        ) {
             val e = OptimizeError(path.toString(), kind, msg)
             request.hooks.onError?.invoke(e)
             errors.add(e)
@@ -80,7 +93,7 @@ object DefaultOptimizer : OptimizerEngine {
             current: Long? = null,
             total: Long? = null,
             path: Path? = null,
-            message: String? = null
+            message: String? = null,
         ) {
             progressSink.emit(ProgressEvent(stage, current, total, path?.toString(), message))
         }
@@ -105,25 +118,26 @@ object DefaultOptimizer : OptimizerEngine {
 
         val processedChunksAtomic = java.util.concurrent.atomic.AtomicLong(0L)
 
-        val ctx = DimensionContext(
-            fs = fs,
-            input = input,
-            out = out,
-            ticks = ticks,
-            progressTotal = progressTotal,
-            processedChunksAtomic = processedChunksAtomic,
-            record = { p, k, m -> record(p, k, m) },
-            emit = { s, c, t, p, m -> emit(s, c, t, p, m) },
-            metricsSink = metrics,
-            removeUnknown = request.filter.removeUnknown,
-            strict = request.filter.strict,
-            progressInterval = request.progress.interval,
-            progressIntervalMs = request.progress.intervalMs,
-            progressSink = progressSink,
-            ioFactory = request.io.ioFactory,
-            parallelism = request.runtime.parallelism,
-            dryRun = request.outputOptions.dryRun
-        )
+        val ctx =
+            DimensionContext(
+                fs = fs,
+                input = input,
+                out = out,
+                ticks = ticks,
+                progressTotal = progressTotal,
+                processedChunksAtomic = processedChunksAtomic,
+                record = { p, k, m -> record(p, k, m) },
+                emit = { s, c, t, p, m -> emit(s, c, t, p, m) },
+                metricsSink = metrics,
+                removeUnknown = request.filter.removeUnknown,
+                strict = request.filter.strict,
+                progressInterval = request.progress.interval,
+                progressIntervalMs = request.progress.intervalMs,
+                progressSink = progressSink,
+                ioFactory = request.io.ioFactory,
+                parallelism = request.runtime.parallelism,
+                dryRun = request.outputOptions.dryRun,
+            )
 
         val removedTotal = processDimensions(ctx, tasks)
 
@@ -155,7 +169,7 @@ object DefaultOptimizer : OptimizerEngine {
         fs: FileSystem,
         request: OptimizerRequest,
         errors: MutableList<OptimizeError>,
-        progressSink: ProgressSink
+        progressSink: ProgressSink,
     ): Path? {
         val input = request.input
         val output = request.output
@@ -184,14 +198,18 @@ object DefaultOptimizer : OptimizerEngine {
                 fs.createDirectories(output)
             }
         } catch (e: IOException) {
-            val msg = "Output directory is not writable or access denied: ${output}"
+            val msg = "Output directory is not writable or access denied: $output"
             errors.add(OptimizeError(output.toString(), "Output", msg))
             return null
         }
         return output
     }
 
-    private fun countMiscFiles(fs: FileSystem, tasks: List<Path>, request: OptimizerRequest): Long {
+    private fun countMiscFiles(
+        fs: FileSystem,
+        tasks: List<Path>,
+        request: OptimizerRequest,
+    ): Long {
         if (request.outputOptions.inPlace || !request.outputOptions.copyMisc) return 0L
         var c = 0L
         val reserved = setOf("region", "entities", "poi")
@@ -208,7 +226,10 @@ object DefaultOptimizer : OptimizerEngine {
         return c
     }
 
-    private fun processDimensions(ctx: DimensionContext, tasks: List<Path>): Long {
+    private fun processDimensions(
+        ctx: DimensionContext,
+        tasks: List<Path>,
+    ): Long {
         if (ctx.parallelism <= 1) {
             return processSerially(ctx, tasks)
         } else {
@@ -216,7 +237,10 @@ object DefaultOptimizer : OptimizerEngine {
         }
     }
 
-    private fun processSerially(ctx: DimensionContext, tasks: List<Path>): Long {
+    private fun processSerially(
+        ctx: DimensionContext,
+        tasks: List<Path>,
+    ): Long {
         var removedTotal = 0L
         tasks.forEach { dim ->
             val result = processSingleDimension(ctx, dim)
@@ -227,7 +251,10 @@ object DefaultOptimizer : OptimizerEngine {
         return removedTotal
     }
 
-    private fun processInParallel(ctx: DimensionContext, tasks: List<Path>): Long {
+    private fun processInParallel(
+        ctx: DimensionContext,
+        tasks: List<Path>,
+    ): Long {
         var removedTotal = 0L
         val executor = java.util.concurrent.Executors.newFixedThreadPool(ctx.parallelism)
         val futures = mutableListOf<java.util.concurrent.Future<DimensionResult>>()
@@ -242,37 +269,49 @@ object DefaultOptimizer : OptimizerEngine {
                 ctx.metricsSink.incProcessed(r.processed)
                 ctx.metricsSink.incRemoved(r.removed)
             } catch (e: Exception) {
-                ctx.record(ctx.input, "Parallel", "Dimension parallel processing failed: ${e.message ?: "unknown error"}")
+                ctx.record(
+                    ctx.input,
+                    "Parallel",
+                    "Dimension parallel processing failed: ${e.message ?: "unknown error"}",
+                )
             }
         }
         executor.shutdown()
         return removedTotal
     }
 
-    private fun processSingleDimension(ctx: DimensionContext, dim: Path): DimensionResult {
+    private fun processSingleDimension(
+        ctx: DimensionContext,
+        dim: Path,
+    ): DimensionResult {
         val rel = ctx.input.relativize(dim)
         val targetDim = ctx.out.resolve(rel)
-        val forced = try {
-            ForceLoad.parse(dim, ctx.strict)
-        } catch (e: ForceLoadedParseException) {
-            if (ctx.strict) ctx.record(dim, "ForceLoaded", e.message ?: "Failed to parse force-loaded chunk list")
-            emptyList()
-        }
-        val patterns = listOf(
-            ListPattern(forced),
-            InhabitedTimePattern(ctx.ticks, ctx.removeUnknown)
-        )
+        val forced =
+            try {
+                ForceLoad.parse(dim, ctx.strict)
+            } catch (e: ForceLoadedParseException) {
+                if (ctx.strict) ctx.record(dim, "ForceLoaded", e.message ?: "Failed to parse force-loaded chunk list")
+                emptyList()
+            }
+        val patterns =
+            listOf(
+                ListPattern(forced),
+                InhabitedTimePattern(ctx.ticks, ctx.removeUnknown),
+            )
         return DimensionProcessor.process(
             ctx.fs, ctx.ioFactory, dim, targetDim, patterns,
             ctx.record, ctx.progressSink, ctx.progressTotal,
             ctx.progressInterval, ctx.progressIntervalMs,
             ctx.processedChunksAtomic, ctx.strict, ctx.parallelism,
-            dryRun = ctx.dryRun
+            dryRun = ctx.dryRun,
         )
     }
 
     private fun handleInPlaceReplacement(
-        fs: FileSystem, tasks: List<Path>, input: Path, out: Path
+        fs: FileSystem,
+        tasks: List<Path>,
+        input: Path,
+        out: Path,
     ) {
         tasks.forEach { dim ->
             val rel = input.relativize(dim)
@@ -285,7 +324,7 @@ object DefaultOptimizer : OptimizerEngine {
                 try {
                     fs.createDirectories(dst)
                 } catch (e: IOException) {
-                    throw InPlaceReplacementException("Failed to create target directory: ${dst}", e)
+                    throw InPlaceReplacementException("Failed to create target directory: $dst", e)
                 }
                 val keep = HashSet<String>()
                 fs.list(src).filter { it.toString().endsWith(".mca") }.forEach { keep.add(it.fileName.toString()) }
@@ -295,7 +334,7 @@ object DefaultOptimizer : OptimizerEngine {
                             if (!keep.contains(p.fileName.toString())) fs.deleteIfExists(p)
                         }
                     } catch (e: IOException) {
-                        throw InPlaceReplacementException("Failed to clean target directory: ${dst}", e)
+                        throw InPlaceReplacementException("Failed to clean target directory: $dst", e)
                     }
                 }
                 try {
@@ -304,7 +343,7 @@ object DefaultOptimizer : OptimizerEngine {
                         fs.copy(p, target, true)
                     }
                 } catch (e: IOException) {
-                    throw InPlaceReplacementException("Failed to copy files to target directory: ${dst}", e)
+                    throw InPlaceReplacementException("Failed to copy files to target directory: $dst", e)
                 }
             }
         }
@@ -312,7 +351,7 @@ object DefaultOptimizer : OptimizerEngine {
             val ok = fs.deleteTreeWithRetry(out, 5, 500)
             if (!ok) throw IOException("cleanup failed")
         } catch (e: IOException) {
-            throw InPlaceReplacementException("Failed to clean up temp directory: ${out}", e)
+            throw InPlaceReplacementException("Failed to clean up temp directory: $out", e)
         }
     }
 
@@ -320,7 +359,7 @@ object DefaultOptimizer : OptimizerEngine {
         ctx: DimensionContext,
         tasks: List<Path>,
         miscTotal: Long,
-        request: OptimizerRequest
+        request: OptimizerRequest,
     ) {
         val base = ctx.processedChunksAtomic.get()
         ctx.emit(ProgressStage.CopyMisc, base, ctx.progressTotal, ctx.out, "copying misc files")
@@ -329,6 +368,7 @@ object DefaultOptimizer : OptimizerEngine {
         var done = 0L
         val useTime = progressIntervalMs > 0
         var lastEmit = System.currentTimeMillis()
+
         fun maybeEmit(p: Path?) {
             if (useTime) {
                 val now = System.currentTimeMillis()
@@ -375,7 +415,10 @@ object DefaultOptimizer : OptimizerEngine {
         ctx.emit(ProgressStage.CopyMiscProgress, base + done, ctx.progressTotal, ctx.out, null)
     }
 
-    private fun handleZipOutput(ctx: DimensionContext, miscTotal: Long) {
+    private fun handleZipOutput(
+        ctx: DimensionContext,
+        miscTotal: Long,
+    ) {
         val base = ctx.processedChunksAtomic.get()
         val afterMisc = base + miscTotal
         try {
@@ -400,7 +443,7 @@ object DefaultOptimizer : OptimizerEngine {
     override fun run(
         input: Path,
         output: Path?,
-        block: OptimizerRequestBuilder.() -> Unit
+        block: OptimizerRequestBuilder.() -> Unit,
     ): OptimizeReport {
         val builder = OptimizerRequestBuilder(input, output)
         builder.block()
