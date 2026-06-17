@@ -20,6 +20,11 @@ complexity:
     active: true
     thresholdInFiles: 20
     thresholdInClasses: 20
+  # 核心引擎函数参数较多（context 模式），提高阈值
+  LongParameterList:
+    active: true
+    functionThreshold: 20
+    constructorThreshold: 10
 
 exceptions:
   TooGenericExceptionCaught:
