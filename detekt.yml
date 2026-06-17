@@ -21,11 +21,6 @@ style:
   UnusedParameter:
     active: false
 
-potential-bugs:
-  # Report.kt String.format 用于 hex 编码（locale 无关）
-  ImplicitDefaultLocale:
-    active: false
-
 empty-blocks:
   # NoopSink 接口默认实现有意为空
   EmptyFunctionBlock:
