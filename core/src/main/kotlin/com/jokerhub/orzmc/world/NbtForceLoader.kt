@@ -115,6 +115,7 @@ object NbtForceLoader {
             "NBT compound depth $depth exceeds maximum $maxCompoundDepth"
         }
         val m = HashMap<String, Any>()
+        @Suppress("LoopWithTooManyJumpStatements")
         while (true) {
             val t = inp.readByte()
             if (t == TAG_END) break

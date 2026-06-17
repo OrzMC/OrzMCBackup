@@ -165,6 +165,7 @@ object DefaultOptimizer : OptimizerEngine {
 
     // ---- extracted helper methods ----
 
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun resolveOutputDir(
         fs: FileSystem,
         request: OptimizerRequest,
@@ -307,6 +308,7 @@ object DefaultOptimizer : OptimizerEngine {
         )
     }
 
+    @Suppress("ThrowsCount")
     private fun handleInPlaceReplacement(
         fs: FileSystem,
         tasks: List<Path>,
@@ -355,6 +357,7 @@ object DefaultOptimizer : OptimizerEngine {
         }
     }
 
+    @Suppress("LoopWithTooManyJumpStatements")
     private fun copyMiscFiles(
         ctx: DimensionContext,
         tasks: List<Path>,

@@ -138,6 +138,7 @@ class McaEntry(
             return hasher.hash(data, 0, data.size, seed)
         }
 
+        @Suppress("ThrowsCount")
         private fun decodeLZ4Blocks(inp: ByteArray): ByteArray {
             var i = 0
             val out = java.io.ByteArrayOutputStream()
