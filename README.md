@@ -1,10 +1,10 @@
 # OrzMCBackup
 
-[![release-lib](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/release-lib.yml/badge.svg)](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/release-lib.yml)
-[![release-app](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/release-app.yml/badge.svg)](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/release-app.yml)
-[![test-matrix](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/test-matrix.yml/badge.svg)](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/test-matrix.yml)
-[![codecov](https://codecov.io/gh/OrzGeeker/OrzMCBackup/branch/main/graph/badge.svg)](https://codecov.io/gh/OrzGeeker/OrzMCBackup)
-[![coverage](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen?logo=kotlin)](https://github.com/OrzGeeker/OrzMCBackup/actions/workflows/test-matrix.yml)
+[![release-lib](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml)
+[![release-app](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml)
+[![test-matrix](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml)
+[![codecov](https://codecov.io/gh/OrzMC/OrzMCBackup/branch/main/graph/badge.svg)](https://codecov.io/gh/OrzMC/OrzMCBackup)
+[![coverage](https://img.shields.io/badge/coverage-%E2%89%A575%25-brightgreen?logo=kotlin)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 
 Kotlin/Gradle 独立工程，提供 Minecraft Java 世界优化功能：扫描各维度的 region/entities/poi MCA 文件，根据 InhabitedTime
@@ -323,13 +323,13 @@ OrzMCBackup/
 - POM 信息：
   - name：OrzMC Backup Core
   - description：Core library for optimizing Minecraft Java worlds
-  - url：https://github.com/OrzGeeker/OrzMCBackup
+  - url：https://github.com/OrzMC/OrzMCBackup
   - license：Apache License 2.0（https://www.apache.org/licenses/LICENSE-2.0）
   - developer：id=orzmc，name=wangzhizhou，email=824219521@qq.com
   - scm：
-    - url：https://github.com/OrzGeeker/OrzMCBackup
-    - connection：scm:git:https://github.com/OrzGeeker/OrzMCBackup.git
-    - developerConnection：scm:git:ssh://git@github.com/OrzGeeker/OrzMCBackup.git
+    - url：https://github.com/OrzMC/OrzMCBackup
+    - connection：scm:git:https://github.com/OrzMC/OrzMCBackup.git
+    - developerConnection：scm:git:ssh://git@github.com/OrzMC/OrzMCBackup.git
 - 产物与签名：
   - sourcesJar：withSourcesJar
   - javadocJar：Dokka 生成后打包

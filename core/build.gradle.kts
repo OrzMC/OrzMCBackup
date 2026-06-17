@@ -106,7 +106,7 @@ publishing {
             pom {
                 name.set("OrzMC Backup Core")
                 description.set("Core library for optimizing Minecraft Java worlds")
-                url.set("https://github.com/OrzGeeker/OrzMCBackup")
+                url.set("https://github.com/OrzMC/OrzMCBackup")
                 licenses {
                     license {
                         name.set("Apache License 2.0")
@@ -121,9 +121,9 @@ publishing {
                     }
                 }
                 scm {
-                    url.set("https://github.com/OrzGeeker/OrzMCBackup")
-                    connection.set("scm:git:https://github.com/OrzGeeker/OrzMCBackup.git")
-                    developerConnection.set("scm:git:ssh://git@github.com/OrzGeeker/OrzMCBackup.git")
+                    url.set("https://github.com/OrzMC/OrzMCBackup")
+                    connection.set("scm:git:https://github.com/OrzMC/OrzMCBackup.git")
+                    developerConnection.set("scm:git:ssh://git@github.com/OrzMC/OrzMCBackup.git")
                 }
             }
         }

@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in OrzMCBackup, please report it privately:
 
-- **Open a GitHub Security Advisory**: [Create a draft advisory](https://github.com/OrzGeeker/OrzMCBackup/security/advisories/new)
+- **Open a GitHub Security Advisory**: [Create a draft advisory](https://github.com/OrzMC/OrzMCBackup/security/advisories/new)
 - **Or send an email**: 824219521@qq.com
 
 Please **do not** report security vulnerabilities through public GitHub issues.
