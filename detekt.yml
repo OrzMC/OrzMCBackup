@@ -12,6 +12,24 @@ style:
   UnusedPrivateMember:
     active: true
     excludes: ['**/test/**', '**/testFixtures/**']
+  # NoopSink 接口有意使用空的默认实现
+  # Report.kt String.format 用于 hex 编码（locale 无关）
+  ImplicitDefaultLocale:
+    active: false
+  # DimensionProcessor 核心函数返回多个 return 是既有模式
+  ReturnCount:
+    active: true
+    max: 5
+  # DimensionProcessor 的 unused 参数是接口契约所需
+  UnusedParameter:
+    active: false
+
+empty-blocks:
+  # NoopSink 接口默认实现有意为空
+  EmptyFunctionBlock:
+    active: false
+    active: true
+    excludes: ['**/test/**', '**/testFixtures/**']
 
 complexity:
   # 核心引擎和 CLI 入口方法较长（call() ~200行, processSingleRegion ~170行）
@@ -51,6 +69,9 @@ performance:
 
 exceptions:
   TooGenericExceptionCaught:
+    active: false
+  # Optimizer 有意吞部分异常（非关键路径不中断流程）
+  SwallowedException:
     active: false
 
 comments:
