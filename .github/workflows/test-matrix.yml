@@ -123,4 +123,5 @@ jobs:
         with:
           directory: core/build/reports/kover/
           token: ${{ secrets.CODECOV_TOKEN }}
+          slug: OrzMC/OrzMCBackup
           fail_ci_if_error: true
