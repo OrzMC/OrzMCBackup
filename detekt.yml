@@ -15,16 +15,22 @@ complexity:
   LongMethod:
     active: true
     threshold: 80
-  # 允许较多的类方法
+  # 允许较多的类方法 — FileSystem 接口 14 个，RealFileSystem/DefaultOptimizer 13-14 个
   TooManyFunctions:
     active: true
     thresholdInFiles: 20
     thresholdInClasses: 20
+    thresholdInInterfaces: 15
+    thresholdInObjects: 15
   # 核心引擎函数参数较多（context 模式），提高阈值
   LongParameterList:
     active: true
     functionThreshold: 20
     constructorThreshold: 10
+  # 解析循环有时需要多个 break/continue（嵌套条件）
+  LoopWithTooManyJumpStatements:
+    active: true
+    maxJumpCount: 3
 
 exceptions:
   TooGenericExceptionCaught:
