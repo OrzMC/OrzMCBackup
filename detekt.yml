@@ -28,8 +28,6 @@ empty-blocks:
   # NoopSink 接口默认实现有意为空
   EmptyFunctionBlock:
     active: false
-    active: true
-    excludes: ['**/test/**', '**/testFixtures/**']
 
 complexity:
   # 核心引擎和 CLI 入口方法较长（call() ~200行, processSingleRegion ~170行）
