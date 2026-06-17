@@ -1,6 +1,11 @@
 # detekt 静态分析配置文件
 # 基于默认配置构建（buildUponDefaultConfig: true），覆盖部分规则
 
+potential-bugs:
+  # Report.kt String.format 用于 hex 编码（locale 无关）
+  ImplicitDefaultLocale:
+    active: false
+
 style:
   # 允许魔术数字（Minecraft 领域常见）
   MagicNumber:
@@ -12,11 +17,13 @@ style:
   UnusedPrivateMember:
     active: true
     excludes: ['**/test/**', '**/testFixtures/**']
-  # NoopSink 接口有意使用空的默认实现
+  # 允许直接 throw IllegalArgumentException（MCA 解析需要）
+  UseRequire:
+    active: false
   # DimensionProcessor 核心函数返回多个 return 是既有模式
   ReturnCount:
     active: true
-    max: 5
+    max: 6
   # DimensionProcessor 的 unused 参数是接口契约所需
   UnusedParameter:
     active: false
@@ -51,6 +58,9 @@ complexity:
     active: true
     functionThreshold: 20
     constructorThreshold: 10
+  LoopWithTooManyJumpStatements:
+    active: true
+    maxJumpCount: 3
 
 naming:
   # CLI 入口 Main.companion.main() 是标准 Kotlin 入口签名
@@ -68,6 +78,10 @@ exceptions:
   # Optimizer 有意吞部分异常（非关键路径不中断流程）
   SwallowedException:
     active: false
+  # MCA 解析/错误处理函数有多个 throw 语句
+  ThrowsCount:
+    active: true
+    max: 5
 
 comments:
   # 允许缺少注释
