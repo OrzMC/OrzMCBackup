@@ -1,7 +1,7 @@
 [versions]
 kotlin = "2.4.20"
 shadow = "9.6.1"
-kover = "0.9.9"
+kover = "0.9.11"
 ktlint = "14.2.0"
 detekt = "2.0.0-alpha.6"
 dokka = "2.2.0"
