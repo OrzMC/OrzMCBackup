@@ -1,5 +1,5 @@
 [versions]
-kotlin = "2.4.20"
+kotlin = "2.4.21"
 shadow = "9.6.1"
 kover = "0.9.11"
 ktlint = "14.2.0"
