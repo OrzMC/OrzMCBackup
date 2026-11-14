@@ -1,16 +1,13 @@
 name: rust
 
 on:
+  # No path filters on purpose: these jobs carry *required* status checks, and a
+  # workflow that does not run leaves the check pending forever (a rust-only PR
+  # would block on the java matrix and vice versa).
   push:
     branches:
       - main
-    paths:
-      - 'rust/**'
-      - '.github/workflows/rust.yml'
   pull_request:
-    paths:
-      - 'rust/**'
-      - '.github/workflows/rust.yml'
 
 permissions:
   contents: read
