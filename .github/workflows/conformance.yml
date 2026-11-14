@@ -3,22 +3,13 @@ name: conformance
 # 语言无关一致性门禁（spec/SPEC.md WOS-12）。
 # 红 = 阻断合并（配合分支保护把本 workflow 设为 required check）。
 on:
+  # Runs on every push/PR (no path filter) on purpose: this workflow is the
+  # required status check for merging, and a workflow that never runs leaves the
+  # check pending forever on docs-only PRs.
   push:
     branches:
       - main
-    paths:
-      - 'spec/**'
-      - 'java/**'
-      - 'rust/**'
-      - 'scripts/conformance.sh'
-      - '.github/workflows/conformance.yml'
   pull_request:
-    paths:
-      - 'spec/**'
-      - 'java/**'
-      - 'rust/**'
-      - 'scripts/conformance.sh'
-      - '.github/workflows/conformance.yml'
   workflow_dispatch:
 
 permissions:
