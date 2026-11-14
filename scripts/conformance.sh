@@ -231,6 +231,8 @@ run_upstream() {
         failures=$((failures + 1))
       else
         echo "  [xfail] $name ($reason)"
+        sed -n '1,3p' "$work/compare.log" 2>/dev/null | sed 's/^/      /'
+        [[ -s "$log" ]] && tail -2 "$log" | sed 's/^/      upstream: /' 
         xfail=$((xfail + 1))
       fi
     elif [[ $ok -eq 1 ]]; then

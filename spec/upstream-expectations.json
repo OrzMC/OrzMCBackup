@@ -1,5 +1,5 @@
 {
-  "note": "Upstream PHP (aternosorg/thanos) is a *reference* implementation. Vectors it cannot run (feature absent) are 'not_applicable'; vectors where it demonstrably behaves differently are 'expected_failures' and must have a row in spec/upstream-divergences.md. Anything else that differs is a real signal: either the spec needs to be aligned with upstream, or upstream is wrong — decide and record it, do not silence it here.",
+  "note": "Filed upstream: see spec/upstream-proposals.md (PRs #28/#29, issues #30/#31). Upstream PHP (aternosorg/thanos) is a *reference* implementation. Vectors it cannot run (feature absent) are 'not_applicable'; vectors where it demonstrably behaves differently are 'expected_failures' and must have a row in spec/upstream-divergences.md. Anything else that differs is a real signal: either the spec needs to be aligned with upstream, or upstream is wrong — decide and record it, do not silence it here.",
   "not_applicable": [
     { "vector": "merge-basic", "reason": "upstream has no merge command (WOS-8 is project-specific)" },
     { "vector": "merge-parallel", "reason": "upstream has no merge command" },

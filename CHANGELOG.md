@@ -20,6 +20,13 @@
   损坏 chunk/region、解压炸弹、符号链接世界、26.1 嵌套维度、merge 全流程与并行确定性、
   重叠拒绝、报告字段语义、`--dry-run` 零写入。
 
+### 上游贡献
+- 向 `aternosorg/thanos` 提交 4 项：不复制 `session.lock`（[PR #28](https://github.com/aternosorg/thanos/pull/28)）、
+  Anvil 位置表溢出守卫（[PR #29](https://github.com/aternosorg/thanos/pull/29)）、
+  legacy `Forced` 的 X/Z 高低位（[issue #30](https://github.com/aternosorg/thanos/issues/30)）、
+  `InhabitedTime` 结构化取值（[issue #31](https://github.com/aternosorg/thanos/issues/31)）。
+  证据链与跟踪状态见 `spec/upstream-proposals.md`。
+
 ### 修复
 - **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
   `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；
