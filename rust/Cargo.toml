@@ -13,7 +13,6 @@ categories = ["command-line-utilities", "games", "filesystem"]
 [dependencies]
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
-walkdir = "2"
 rayon = "1"
 flate2 = { version = "1", features = ["zlib"] }
 lz4_flex = "0.11"
@@ -25,7 +24,11 @@ xxhash-rust = { version = "0.8", features = ["xxh32"] }
 log = "0.4"
 env_logger = "0.11"
 indicatif = "0.17"
-fs_extra = "1"
 console = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 zip = "0.6"
+
+[dev-dependencies]
+# Test-only helpers: copying fixture worlds and walking temp trees.
+walkdir = "2"
+fs_extra = "1"
