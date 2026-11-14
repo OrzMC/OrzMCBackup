@@ -1,0 +1,19 @@
+{
+  "vector": "threshold-zero",
+  "title": "threshold-zero",
+  "command": "backup",
+  "clauses": [
+    "WOS-1.1",
+    "WOS-1.2",
+    "WOS-2.1",
+    "WOS-2.2",
+    "WOS-2.3",
+    "WOS-3.2",
+    "WOS-6.2",
+    "WOS-6.3"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "0"
+  ]
+}

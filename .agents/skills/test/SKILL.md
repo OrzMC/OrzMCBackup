@@ -8,28 +8,28 @@ description: 运行 OrzMCBackup 的测试：全量、模块级、单个测试类
 ## 全量测试
 
 ```bash
-./gradlew :core:test :app:test --no-daemon
+java/gradlew -p java :core:test :app:test --no-daemon
 ```
 
 ## 单模块
 
 ```bash
-./gradlew :core:test --no-daemon    # 库模块
-./gradlew :app:test --no-daemon     # CLI 模块
+java/gradlew -p java :core:test --no-daemon    # 库模块
+java/gradlew -p java :app:test --no-daemon     # CLI 模块
 ```
 
 ## 单个测试类
 
 ```bash
-./gradlew :core:test --tests "com.jokerhub.orzmc.MemoryE2ETest" --no-daemon
-./gradlew :core:test --tests "com.jokerhub.orzmc.WorldMergerTest" --no-daemon
-./gradlew :app:test --tests "com.jokerhub.orzmc.cli.MainCliMergeTest" --no-daemon
+java/gradlew -p java :core:test --tests "com.jokerhub.orzmc.MemoryE2ETest" --no-daemon
+java/gradlew -p java :core:test --tests "com.jokerhub.orzmc.WorldMergerTest" --no-daemon
+java/gradlew -p java :app:test --tests "com.jokerhub.orzmc.cli.MainCliMergeTest" --no-daemon
 ```
 
 ## 单个测试方法
 
 ```bash
-./gradlew :core:test --tests "com.jokerhub.orzmc.MemoryE2ETest.end-to-end optimize with MemoryFS and MemoryMcaIOFactory" --no-daemon
+java/gradlew -p java :core:test --tests "com.jokerhub.orzmc.MemoryE2ETest.end-to-end optimize with MemoryFS and MemoryMcaIOFactory" --no-daemon
 ```
 
 ## 关键测试类索引
@@ -44,4 +44,4 @@ description: 运行 OrzMCBackup 的测试：全量、模块级、单个测试类
 
 - 端到端测试用 `MemoryFS` + `MemoryMcaIOFactory`（无需磁盘）；真实夹具在
   `core/src/test/resources/Fixtures/`
-- 覆盖门槛：`./gradlew :core:koverVerify :app:koverVerify --no-daemon`（core ≥75%、app ≥50%）
+- 覆盖门槛：`java/gradlew -p java :core:koverVerify :app:koverVerify --no-daemon`（core ≥75%、app ≥50%）

@@ -1,0 +1,18 @@
+{
+  "vector": "report-fields",
+  "title": "report-fields",
+  "command": "backup",
+  "clauses": [
+    "WOS-9.1",
+    "WOS-9.2"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ],
+  "report": {
+    "processedChunks": 4,
+    "removedChunks": 2,
+    "errorKinds": []
+  }
+}

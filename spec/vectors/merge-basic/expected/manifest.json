@@ -1,0 +1,99 @@
+{
+  "files": [
+    {
+      "path": "data/marker.txt",
+      "sha256": "309f5fec76e659700717b95474a84f1389aa490ecea98fab7f1a4fb17fef8706"
+    },
+    {
+      "path": "entities/r.0.0.mca",
+      "slots": [
+        {
+          "index": 0,
+          "modified_time": 1700000000,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        },
+        {
+          "index": 1,
+          "modified_time": 1600000001,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 33,
+          "modified_time": 1700000033,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        }
+      ]
+    },
+    {
+      "path": "entities/r.1.0.mca",
+      "slots": [
+        {
+          "index": 5,
+          "modified_time": 1700000005,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        }
+      ]
+    },
+    {
+      "path": "level.dat",
+      "sha256": "fa38d45bc37ed0c9a85f8566c2945a9af4e74d36cf985bdd87360284d0c9e97d"
+    },
+    {
+      "path": "poi/r.0.0.mca",
+      "slots": [
+        {
+          "index": 1,
+          "modified_time": 1600000001,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 33,
+          "modified_time": 1700000033,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        }
+      ]
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 0,
+          "modified_time": 1700000000,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        },
+        {
+          "index": 1,
+          "modified_time": 1600000001,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 33,
+          "modified_time": 1700000033,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        }
+      ]
+    },
+    {
+      "path": "region/r.0.1.mca",
+      "slots": [
+        {
+          "index": 7,
+          "modified_time": 1600000007,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        }
+      ]
+    },
+    {
+      "path": "region/r.1.0.mca",
+      "slots": [
+        {
+          "index": 5,
+          "modified_time": 1700000005,
+          "payload_sha256": "b8b743021f7d26115ba28d9ea11acb09b7b4b09c97c99d1fc5b45cdbb50e7ec4"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "merge-basic"
+}

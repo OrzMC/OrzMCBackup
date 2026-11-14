@@ -1,0 +1,22 @@
+{
+  "vector": "world-26-1",
+  "title": "world-26-1",
+  "command": "backup",
+  "clauses": [
+    "WOS-1.1",
+    "WOS-1.2",
+    "WOS-2.1",
+    "WOS-2.2",
+    "WOS-2.3",
+    "WOS-4.1",
+    "WOS-4.2",
+    "WOS-6.2",
+    "WOS-6.3",
+    "WOS-7.1",
+    "WOS-7.2"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "1000000"
+  ]
+}

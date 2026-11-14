@@ -1,0 +1,13 @@
+{
+  "vector": "symlink-world",
+  "title": "symlink-world",
+  "command": "backup",
+  "world": "symlink",
+  "clauses": [
+    "WOS-7.5"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

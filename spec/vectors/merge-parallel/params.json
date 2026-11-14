@@ -1,0 +1,12 @@
+{
+  "vector": "merge-parallel",
+  "title": "merge-parallel",
+  "command": "merge",
+  "clauses": [
+    "WOS-8.8"
+  ],
+  "args": [
+    "--parallelism",
+    "4"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "files": [
+    {
+      "path": "data/chunks.dat",
+      "sha256": "fa4e7905ea4f30641b823a44eb2032c774a51b6bafca8cb900c927956279dd94"
+    },
+    {
+      "path": "level.dat",
+      "sha256": "82884144390539e6a0d85ff217acb86f6ca4d81a8e8df7c0336ffc798b739b9b"
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 5,
+          "modified_time": 1700000005,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 65,
+          "modified_time": 1700000065,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 650,
+          "modified_time": 1700000650,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "forceload-forced"
+}

@@ -1,0 +1,12 @@
+{
+  "vector": "corrupt-chunk",
+  "title": "corrupt-chunk",
+  "command": "backup",
+  "clauses": [
+    "WOS-6.6"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "vector": "cli-dry-run",
+  "title": "cli-dry-run",
+  "command": "backup",
+  "clauses": [
+    "WOS-9.5"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ],
+  "dry_run": true,
+  "expect_no_output": true
+}

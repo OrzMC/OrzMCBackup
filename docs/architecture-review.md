@@ -264,7 +264,7 @@
 - 证据：setup-java `cache: gradle` 与 `gradle/actions/setup-gradle` 职责重叠。建议去掉前者。
 
 **C7.【P2-低】`--no-daemon` 让 lint/coverage 各启动两次 JVM**
-- 建议：合并为单条 `./gradlew ktlintCheck detekt`、`./gradlew :core:koverXmlReport :core:koverVerify :app:koverXmlReport :app:koverVerify`。
+- 建议：合并为单条 `java/gradlew -p java ktlintCheck detekt`、`java/gradlew -p java :core:koverXmlReport :core:koverVerify :app:koverXmlReport :app:koverVerify`。
 
 ### lint / coverage
 

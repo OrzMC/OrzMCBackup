@@ -1,0 +1,35 @@
+{
+  "files": [
+    {
+      "path": "entities/r.0.0.mca",
+      "slots": [
+        {
+          "index": 0,
+          "modified_time": 1600000000,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        }
+      ]
+    },
+    {
+      "path": "level.dat",
+      "sha256": "fa38d45bc37ed0c9a85f8566c2945a9af4e74d36cf985bdd87360284d0c9e97d"
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 0,
+          "modified_time": 1600000000,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        },
+        {
+          "index": 1,
+          "modified_time": 1600000001,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "merge-corrupt-patch"
+}

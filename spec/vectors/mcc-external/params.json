@@ -1,0 +1,14 @@
+{
+  "vector": "mcc-external",
+  "title": "mcc-external",
+  "command": "backup",
+  "clauses": [
+    "WOS-2.5",
+    "WOS-5.3",
+    "WOS-7.3"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

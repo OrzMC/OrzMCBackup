@@ -1,0 +1,15 @@
+{
+  "vector": "overlap-rejected",
+  "title": "overlap-rejected",
+  "command": "backup",
+  "clauses": [
+    "WOS-10.1"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300",
+    "--strict"
+  ],
+  "output": "input",
+  "expect_exit": 1
+}

@@ -1,0 +1,11 @@
+{
+  "vector": "merge-overlap",
+  "title": "merge-overlap",
+  "command": "merge",
+  "clauses": [
+    "WOS-8.1"
+  ],
+  "args": [],
+  "output": "base",
+  "expect_exit": 1
+}

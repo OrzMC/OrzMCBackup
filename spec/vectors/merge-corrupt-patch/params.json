@@ -1,0 +1,9 @@
+{
+  "vector": "merge-corrupt-patch",
+  "title": "merge-corrupt-patch",
+  "command": "merge",
+  "clauses": [
+    "WOS-8.6"
+  ],
+  "args": []
+}

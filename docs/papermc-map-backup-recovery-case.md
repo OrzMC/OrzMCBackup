@@ -86,9 +86,9 @@ base/patch/output 三个目录必须互不重叠：`overlaps()` 对绝对化归�
 
 ```bash
 # 构建
-./gradlew :app:shadowJar --no-daemon
+java/gradlew -p java :app:shadowJar --no-daemon
 # 合并（BASE=08-12 全量，PATCH=08-15 优化，OUTPUT=恢复结果）
-java -jar app/build/libs/backup.jar merge E:\recover\world E:\recover\world_backup E:\recover\world_recovered \
+java -jar java/app/build/libs/backup.jar merge E:\recover\world E:\recover\world_backup E:\recover\world_recovered \
   --report --progress-mode Global
 ```
 

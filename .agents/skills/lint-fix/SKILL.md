@@ -8,20 +8,20 @@ description: 运行 OrzMCBackup 的代码风格与静态分析检查（ktlint / 
 ## 自动修复风格问题（ktlint）
 
 ```bash
-./gradlew ktlintFormat --no-daemon
+java/gradlew -p java ktlintFormat --no-daemon
 ```
 
 ## 检查
 
 ```bash
-./gradlew ktlintCheck detekt --no-daemon
+java/gradlew -p java ktlintCheck detekt --no-daemon
 ```
 
 ## 单模块快速检查（改动集中在某模块时）
 
 ```bash
-./gradlew :core:ktlintCheck :core:detekt --no-daemon
-./gradlew :app:ktlintCheck :app:detekt --no-daemon
+java/gradlew -p java :core:ktlintCheck :core:detekt --no-daemon
+java/gradlew -p java :app:ktlintCheck :app:detekt --no-daemon
 ```
 
 ## 常见规则要点

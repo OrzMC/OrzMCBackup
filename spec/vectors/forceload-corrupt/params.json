@@ -1,0 +1,12 @@
+{
+  "vector": "forceload-corrupt",
+  "title": "forceload-corrupt",
+  "command": "backup",
+  "clauses": [
+    "WOS-4.4"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

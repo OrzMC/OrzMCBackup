@@ -1,0 +1,42 @@
+{
+  "files": [
+    {
+      "path": "datapacks/pack.mcmeta",
+      "sha256": "ecf5432672dd06259977868f73968fa862e70b2c76f5509ea74cc69f694f25d8"
+    },
+    {
+      "path": "entities/r.0.1.mca",
+      "slots": [
+        {
+          "index": 3,
+          "modified_time": 1650000003,
+          "payload_sha256": "73a0ce0a4152507f1a72b645b9464262a6ea9cbf88fe5a8dce567b9cfc7a699b"
+        }
+      ]
+    },
+    {
+      "path": "level.dat",
+      "sha256": "0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+    },
+    {
+      "path": "region/notes.txt",
+      "sha256": "ab5aa97074c454a0632057e704220d9a6678fbf773a0a5806fc09b8173b07309"
+    },
+    {
+      "path": "region/r.0.1.mca",
+      "slots": [
+        {
+          "index": 3,
+          "modified_time": 1650000003,
+          "payload_sha256": "73a0ce0a4152507f1a72b645b9464262a6ea9cbf88fe5a8dce567b9cfc7a699b"
+        }
+      ]
+    },
+    {
+      "path": "region/r.0.1.mca.bak",
+      "sha256": "4c02bda2d5689404c7175b32e6fd2b515e4fcf9b6cff55e99da457cdd2493e6e"
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "world-basic"
+}

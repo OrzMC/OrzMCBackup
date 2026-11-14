@@ -4,7 +4,7 @@
 >
 > 测试对象：`E:\recover\world`（真实 PaperMC 26.2 世界，08-12 全量备份恢复数据，与 merge 恢复案例同源）
 >
-> 测试工具：OrzMCBackup（`app/build/libs/backup.jar`，含 miscRel 修复与回归测试后的最终代码）
+> 测试工具：OrzMCBackup（`java/app/build/libs/backup.jar`，含 miscRel 修复与回归测试后的最终代码）
 >
 > 测试环境：Windows 11 / i7-9750H (6C12T) / 32GB RAM；**E: 为 7200rpm 机械盘（ST1000LM049）**，世界与输出均在其上
 >

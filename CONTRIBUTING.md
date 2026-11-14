@@ -7,10 +7,10 @@
 1. **Fork 本仓库** 并创建你的特性分支
 2. **本地开发**：参考 [CLAUDE.md](CLAUDE.md) 中的常用命令
 3. **提交 PR** 前确保：
-   - `./gradlew ktlintCheck --no-daemon` 通过（代码风格）
-   - `./gradlew detekt --no-daemon` 通过（静态分析）
-   - `./gradlew :core:test :app:test --no-daemon` 通过（全部测试）
-   - `./gradlew :core:koverVerify --no-daemon` 通过（覆盖率门禁 ≥ 75%）
+   - `java/gradlew -p java ktlintCheck --no-daemon` 通过（代码风格）
+   - `java/gradlew -p java detekt --no-daemon` 通过（静态分析）
+   - `java/gradlew -p java :core:test :app:test --no-daemon` 通过（全部测试）
+   - `java/gradlew -p java :core:koverVerify --no-daemon` 通过（覆盖率门禁 ≥ 75%）
 
 ## 代码风格
 

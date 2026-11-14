@@ -1,0 +1,3 @@
+[submodule "upstream/thanos"]
+	path = upstream/thanos
+	url = https://github.com/aternosorg/thanos.git

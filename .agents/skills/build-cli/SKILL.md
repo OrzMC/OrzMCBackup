@@ -1,6 +1,6 @@
 ---
 name: build-cli
-description: 构建 OrzMCBackup 的 CLI fat JAR（shadowJar）。产物位于 app/build/libs/backup.jar。当需要生成可执行 JAR、验证 CLI 可运行、或发布前构建时使用。
+description: 构建 OrzMCBackup 的 CLI fat JAR（shadowJar）。产物位于 java/app/build/libs/backup.jar。当需要生成可执行 JAR、验证 CLI 可运行、或发布前构建时使用。
 ---
 
 # 构建 CLI fat JAR
@@ -8,10 +8,10 @@ description: 构建 OrzMCBackup 的 CLI fat JAR（shadowJar）。产物位于 ap
 构建命令（Gradle Wrapper，无守护进程）：
 
 ```bash
-./gradlew :app:shadowJar --no-daemon
+java/gradlew -p java :app:shadowJar --no-daemon
 ```
 
-产物：`app/build/libs/backup.jar`（文件名固定，版本只写入 manifest 的 `Implementation-Version`）
+产物：`java/app/build/libs/backup.jar`（文件名固定，版本只写入 manifest 的 `Implementation-Version`）
 
 ## 版本说明
 
@@ -21,13 +21,13 @@ description: 构建 OrzMCBackup 的 CLI fat JAR（shadowJar）。产物位于 ap
 - 需要指定版本时：
 
 ```bash
-./gradlew :app:shadowJar -Pversion=0.3.0 --no-daemon
+java/gradlew -p java :app:shadowJar -Pversion=0.3.0 --no-daemon
 ```
 
 ## 运行验证
 
 ```bash
-java -jar app/build/libs/backup.jar --help
+java -jar java/app/build/libs/backup.jar --help
 ```
 
 帮助输出应显示 `backup` 命令与全部选项（`-t/--inhabited-time-seconds`、`--in-place`、`--copy-misc`、

@@ -1,0 +1,152 @@
+name: release-java-lib
+
+on:
+  push:
+    tags:
+      - 'java-v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.2.3)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/java-v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate release tag format
+        if: github.event_name == 'push'
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ ! "$TAG" =~ ^java-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ Invalid tag: $TAG (expected java-vX.Y.Z)"
+            exit 1
+          fi
+          echo "✅ Tag format valid: $TAG (java)"
+      - name: Dry-run local publish (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: java/gradlew -p java :core:publishToMavenLocal -Pversion=${{ inputs.version }}-SNAPSHOT --no-daemon
+      - name: Set version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ inputs.version }}" >> $GITHUB_ENV
+          else
+            echo "VERSION=${GITHUB_REF_NAME#java-v}" >> $GITHUB_ENV
+          fi
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v6.4.0
+      - name: Run lint gates
+        # C11: tag push 不触发 test-matrix，release 自带 ktlint/detekt 门禁
+        run: java/gradlew -p java ktlintCheck detekt --no-daemon
+      - name: Run unit tests
+        run: java/gradlew -p java :core:test :app:test --no-daemon -Pversion=${{ env.VERSION }}
+      - name: Build signed portal bundle
+        env:
+          # C10: GPG 私钥经 ORG_GRADLE_PROJECT_ 环境变量注入，避免明文出现在进程命令行
+          ORG_GRADLE_PROJECT_signingKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingPassword: ${{ secrets.SIGNING_PASSWORD }}
+          ORG_GRADLE_PROJECT_signingKey: ${{ secrets.SIGNING_KEY }}
+        run: java/gradlew -p java :core:portalBundle --no-daemon -Pversion=${{ env.VERSION }}
+      - name: Validate artifacts and signatures
+        run: |
+          # C12: 生成后立即用同一批本地文件反验是自证式同义反复，无法发现上传损坏；
+          # 仅保留产物与 .asc 签名存在性检查，真实校验应在 Portal 返回后回下载验证。
+          ART_DIR="java/core/build/portal-repo/io/github/wangzhizhou/backup-core/${VERSION}"
+          ls -la "$ART_DIR"
+          files=("backup-core-${VERSION}.jar" "backup-core-${VERSION}-sources.jar" "backup-core-${VERSION}-javadoc.jar" "backup-core-${VERSION}.pom")
+          for f in "${files[@]}"; do
+            test -s "$ART_DIR/$f" || { echo "missing artifact: $f"; exit 1; }
+            test -s "$ART_DIR/$f.asc" || { echo "missing signature: $f.asc"; exit 1; }
+          done
+      - name: Validate bundle archive
+        run: |
+          test -s java/core/build/portal-bundle.zip || { echo "missing portal-bundle.zip"; exit 1; }
+          unzip -t java/core/build/portal-bundle.zip
+          sha256sum java/core/build/portal-bundle.zip
+      - name: Upload bundle to Central Portal
+        if: github.event_name == 'push'
+        env:
+          CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
+          CENTRAL_PORTAL_UPLOAD_URL: ${{ secrets.CENTRAL_PORTAL_UPLOAD_URL }}
+        run: |
+          test -n "${CENTRAL_PORTAL_UPLOAD_URL}" || { echo "missing CENTRAL_PORTAL_UPLOAD_URL"; exit 1; }
+          test -n "${CENTRAL_TOKEN}" || { echo "missing CENTRAL_TOKEN"; exit 1; }
+
+          # C9: Portal 201/2xx 仅表示 bundle 已接收，后续签名/坐标校验失败 workflow 仍会绿。
+          # 必须解析出 deploymentId 并轮询发布状态直到 SUCCESS/FAILED。
+          DEPLOYMENT_ID=""
+          attempts=0
+          while [ $attempts -lt 3 ] && [ -z "$DEPLOYMENT_ID" ]; do
+            code=$(curl -sS -X POST -H "Authorization: Bearer ${CENTRAL_TOKEN}" -H "Content-Type: multipart/form-data" -H "accept: application/json" -F "bundle=@java/core/build/portal-bundle.zip;type=application/zip" "${CENTRAL_PORTAL_UPLOAD_URL}" -o resp.txt -D headers.txt -w '%{http_code}' || true)
+            echo "upload HTTP $code (attempt $((attempts+1))/3)"
+            cat headers.txt
+            cat resp.txt
+            if [ "$code" -ge 200 ] && [ "$code" -lt 300 ]; then
+              # Portal 201 响应体是裸 deploymentId（UUID），非 JSON；用 UUID 形状提取，
+              # 兼容两种格式，避免匹配失败误报 "no deploymentId" 造成重复上传。
+              DEPLOYMENT_ID=$(tr -d '\r\n' < resp.txt | sed -n 's/.*\([0-9a-fA-F]\{8\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{4\}-[0-9a-fA-F]\{12\}\).*/\1/p')
+              [ -n "$DEPLOYMENT_ID" ] || echo "no deploymentId in response; retrying"
+            fi
+            attempts=$((attempts+1))
+            [ -n "$DEPLOYMENT_ID" ] || sleep $((5*attempts))
+          done
+          [ -n "$DEPLOYMENT_ID" ] || { echo "❌ upload failed or no deploymentId after $attempts attempts"; exit 1; }
+          echo "✅ Deployment submitted: $DEPLOYMENT_ID"
+
+          PORTAL_BASE="${CENTRAL_PORTAL_UPLOAD_URL%%/api/v1/publisher/upload*}"
+          STATUS_URL="${PORTAL_BASE}/api/v1/publisher/status"
+          # 文档（central.sonatype.org/publish/publish-portal-api/）：status 是 POST，query 传
+          # id=<deploymentId>，响应 JSON 用 deploymentState 字段；状态值 PENDING/VALIDATING/
+          # VALIDATED/PUBLISHING/PUBLISHED/FAILED。USER_MANAGED 模式下停在 VALIDATED，需手动
+          # POST deployment/<id> 触发发布（204）。upload 未指定 publishingType 时默认 AUTOMATIC，
+          # 无需手动 publish，但兜底覆盖两种模式。
+          # v0.3.1 实测：Portal PUBLISHING 阶段可长达 12+ 分钟（无 errors，Central 后端慢）。
+          # 原 30×15s=7.5min 窗口会误判 timeout（deployment 实际仍在发布，假阴性）。
+          # 放宽到 60×20s=20min；仍超时则多半是 deployment 卡死，需人工查 Portal。
+          published=0
+          attempts=0
+          publish_sent=0
+          while [ $attempts -lt 60 ]; do
+            status_resp=$(curl -sS -X POST -H "Authorization: Bearer ${CENTRAL_TOKEN}" "${STATUS_URL}?id=${DEPLOYMENT_ID}" || true)
+            state=$(echo "$status_resp" | sed -n 's/.*"deploymentState"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | tr -d '\r')
+            echo "Portal state: ${state:-<empty>} (attempt $((attempts+1))/60)"
+            case "$state" in
+              PUBLISHED)
+                published=1
+                break
+                ;;
+              FAILED)
+                echo "❌ Portal publish failed: $status_resp"
+                exit 1
+                ;;
+              VALIDATED)
+                if [ "$publish_sent" -eq 0 ]; then
+                  publish_resp=$(curl -sS -X POST -H "Authorization: Bearer ${CENTRAL_TOKEN}" "${PORTAL_BASE}/api/v1/publisher/deployment/${DEPLOYMENT_ID}" -o /dev/null -w '%{http_code}' || true)
+                  echo "manual publish HTTP $publish_resp (deployment $DEPLOYMENT_ID)"
+                  publish_sent=1
+                fi
+                attempts=$((attempts+1))
+                sleep 20
+                ;;
+              *)
+                attempts=$((attempts+1))
+                sleep 20
+                ;;
+            esac
+          done
+          if [ "$published" -eq 1 ]; then
+            echo "✅ Portal publish succeeded (deployment $DEPLOYMENT_ID)"
+          else
+            echo "❌ timeout waiting for Portal status (deployment $DEPLOYMENT_ID)"
+            exit 1
+          fi
+      - run: java/gradlew -p java --stop

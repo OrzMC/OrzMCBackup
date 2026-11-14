@@ -1,5 +1,32 @@
 # Changelog
 
+## Unreleased
+
+### 行为变更（用户可见）
+- **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其 `entities`/`poi`
+  兄弟文件会被**原样复制**到输出，并记录错误（规范 WOS-6.7）。此前该 region 会从备份中缺失。
+  Rust 实现一直如此，本次对齐 Java 实现。
+
+### 新增
+- `merge --dry-run` + `--diff-file`：只预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
+- `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
+- **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、
+  `upstream/thanos`（官方 PHP，嵌套只读子模块）。命令改为 `java/gradlew -p java <task>`。
+- `scripts/conformance.sh` + `spec/vectors`（**21 个向量**）：跨实现一致性门禁（CI 阻断）；
+  条款覆盖 46/53（`spec/tools/coverage.py`）。向量覆盖：压缩矩阵、外部 `.mcc`、`CUSTOM` 压缩、
+  损坏 chunk/region、解压炸弹、符号链接世界、26.1 嵌套维度、merge 全流程与并行确定性、
+  重叠拒绝、报告字段语义、`--dry-run` 零写入。
+
+### 修复
+- **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
+  `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；
+  原先的纯字节前缀搜索会命中第一个匹配的字节序列，可能把该删的区块留下（或反之）。
+  两实现同步修正，向量 `inhabited-nested` 回归。
+- legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
+- **Rust CLI 的输入/输出重叠不再可能删掉源世界**：`rust-thanos backup /world /world` 原会先问
+  "是否覆盖"、答 `y` 即 `remove_dir_all(/world)`，之后才跑到重叠守卫。现在重叠守卫在任何提示/删除
+  之前执行（规范 WOS-10.1），由 `spec/vectors/overlap-rejected` 回归。
+
 ## v0.3.1 (2026-08-20)
 
 ### Bugfix
@@ -169,7 +196,7 @@
 
 ### Quality Gate
 - **koverVerify 绑定 `check`**：core/app 均加 `tasks.check { dependsOn("koverVerify") }`，
-  coverage 阈值（core 75% / app 50%）不达标时 `./gradlew check` 直接失败，门禁不再可被绕过。
+  coverage 阈值（core 75% / app 50%）不达标时 `java/gradlew -p java check` 直接失败，门禁不再可被绕过。
 
 ### CI (C1–C4 / C9–C11)
 - **test-matrix**：macOS 裁剪为单 JDK（C1）；JDK 矩阵降为 `['17','21']`（C2）；push 仅触发 main +

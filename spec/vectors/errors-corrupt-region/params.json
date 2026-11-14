@@ -1,0 +1,21 @@
+{
+  "vector": "errors-corrupt-region",
+  "title": "errors-corrupt-region",
+  "command": "backup",
+  "clauses": [
+    "WOS-1.1",
+    "WOS-1.2",
+    "WOS-2.1",
+    "WOS-2.2",
+    "WOS-2.3",
+    "WOS-6.2",
+    "WOS-6.3",
+    "WOS-6.7",
+    "WOS-9.3",
+    "WOS-9.4"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}
