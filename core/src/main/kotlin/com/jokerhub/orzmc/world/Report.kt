@@ -17,7 +17,7 @@ data class OptimizeError(
 
 /**
  * Summary report for an optimization run.
- * @property processedChunks total chunks that were kept after filtering
+ * @property processedChunks total chunks visited by the filter (kept + removed)
  * @property removedChunks total chunks that were removed
  * @property errors list of non-fatal errors encountered
  */

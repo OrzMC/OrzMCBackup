@@ -31,6 +31,7 @@ Minecraft Java 版世界优化工具，双用途：
 | `FilterOptions` | `inhabitedThresholdSeconds=300` | 活跃时间阈值（秒） |
 | | `removeUnknown=false` | 是否移除外部压缩/不可解析的区块 |
 | | `strict=false` | 严格模式（I/O 错误提升为退出码 1） |
+| | `extraPatterns=[]` | 追加的保留模式（`ChunkPattern`，任一命中即保留；如 `RangePattern`） |
 | `OutputOptions` | `inPlace=false` | 原地替换模式 |
 | | `zipOutput=false` | 输出打包为 ZIP |
 | | `force=false` | 强制覆盖非空输出目录 |
@@ -110,12 +111,26 @@ Minecraft Java 版世界优化工具，双用途：
 - 根据全局 `(x, z)` 坐标列表保留区块
 - 用于强制加载区块的保留，也可用于自定义保留列表
 
-### 4.3 模式组合
+### 4.3 `RangePattern` — 矩形区域模式
 
-优化器始终合并两种模式：`ListPattern(forced) + InhabitedTimePattern(ticks, removeUnknown)`
-- 顺序：按列表顺序评估
-- **匹配任意一个模式 → 保留区块**
+- 按**全局区块坐标**的闭区间矩形保留：`RangePattern(startX, startZ, endX, endZ)`
+- 两个角点顺序无关（内部取 min/max 归一化），与上游 `aternos/thanos` 的 `RangePattern` 语义一致
+- 典型用途：无条件保护出生点/主城矩形，不受 InhabitedTime 影响
+
+### 4.4 模式组合
+
+优化器始终合并内置两种模式，并追加调用方注入的自定义模式：
+
+```
+patterns = [ListPattern(forced), InhabitedTimePattern(ticks, removeUnknown)] + FilterOptions.extraPatterns
+```
+
+- 顺序：按列表顺序评估，短路返回
+- **匹配任意一个模式 → 保留区块**（OR）
 - 均不匹配 → 移除区块
+- 注入方式：`FilterOptions(extraPatterns = listOf(RangePattern(...)))`，或 Builder 的
+  `addPattern(...)` / `extraPatterns = ...`
+- 自定义模式只需实现 `ChunkPattern.matches(entry: McaEntry): Boolean`
 
 ---
 
@@ -503,4 +518,4 @@ Minecraft Java 版世界优化工具，双用途：
 6. **双节流进度**：支持按区块数和按毫秒两种进度汇报频率
 7. **MCA 读写缓冲**：8KiB 对齐读缓冲减少系统调用
 8. **26.1+ 兼容**：递归维度发现 + 新版 `chunk_tickets.dat` 优先探测
-9. **模式链而非单一策略**：`ListPattern` + `InhabitedTimePattern` 链式评估
+9. **模式链而非单一策略**：`ListPattern` + `InhabitedTimePattern` + 可注入的 `extraPatterns` 链式评估

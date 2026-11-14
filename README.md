@@ -217,6 +217,21 @@ val request = OptimizerRequest(
 val report = Optimizer.run(request)
 ```
 
+**自定义保留模式（`ChunkPattern`）**：内置 `ListPattern`（强制加载坐标）与 `InhabitedTimePattern`
+之外，任何 `ChunkPattern` 都可以通过 `FilterOptions.extraPatterns` 注入（任一命中即保留）。
+内置的 `RangePattern` 用于无条件保护一个矩形区域（角点顺序无关）：
+
+```kotlin
+val request = OptimizerRequest(
+    input = Paths.get("/path/to/world"),
+    output = Paths.get("/path/to/out"),
+    filter = FilterOptions(
+        inhabitedThresholdSeconds = 300,
+        extraPatterns = listOf(RangePattern(-8, -8, 8, 8)), // 主城 17x17 区块，永不裁剪
+    ),
+)
+```
+
 **merge 复用（`WorldMerger`）**：`WorldMerger.run(MergeRequest)` 与 CLI `merge` 使用完全相同的
 槽位级合并算法；`MergeReportIO.write(report, path, format)` 无损落盘 JSON/CSV。
 
@@ -251,7 +266,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
   → 统计所有 MCA 文件中的总区块数
   → 按维度逐个处理（串行或并行）：
       解析强制加载坐标（chunk_tickets.dat / chunks.dat 自动探测）
-      对每个区块评估保留模式（ListPattern 强制加载 + InhabitedTimePattern 阈值）
+      对每个区块评估保留模式（ListPattern 强制加载 + InhabitedTimePattern 阈值 + extraPatterns）
       匹配 → 重写 region + entities + poi .mca（三文件锁步）
   → 复制杂项文件 / ZIP 打包 / 原地替换
   → 输出 OptimizeReport（JSON / CSV / 文本）
@@ -273,6 +288,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 | [`docs/paper-26.1-world-migration-report.md`](docs/paper-26.1-world-migration-report.md) | 26.1+ 目录结构迁移分析 |
 | [`docs/world-directory-structure-comparison.md`](docs/world-directory-structure-comparison.md) | 旧版/新版/原生目录结构对比 |
 | [`docs/market-positioning-analysis.md`](docs/market-positioning-analysis.md) | 市场定位、竞品与产品化分析 |
+| [`docs/upstream-comparison.md`](docs/upstream-comparison.md) | 与上游 `aternos/thanos` 的功能对照、差异与已知增强项 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 版本历史与变更说明 |
 
 > 🚀 产品落地页（GitHub Pages）：[orzmc.github.io/OrzMCBackup](https://orzmc.github.io/OrzMCBackup/)

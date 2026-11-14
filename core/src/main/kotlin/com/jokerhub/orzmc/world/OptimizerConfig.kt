@@ -1,5 +1,6 @@
 package com.jokerhub.orzmc.world
 
+import com.jokerhub.orzmc.patterns.ChunkPattern
 import java.nio.file.Path
 import java.nio.file.Paths
 
@@ -18,6 +19,14 @@ data class FilterOptions(
     val inhabitedThresholdSeconds: Long = 300,
     val removeUnknown: Boolean = false,
     val strict: Boolean = false,
+    /**
+     * Additional keep patterns, evaluated after the built-in force-load list and the
+     * InhabitedTime threshold. Any match keeps the chunk (patterns are OR-ed), so callers can
+     * protect regions the defaults do not know about — e.g. a spawn rectangle
+     * ([com.jokerhub.orzmc.patterns.RangePattern]) or a coordinate list
+     * ([com.jokerhub.orzmc.patterns.ListPattern]).
+     */
+    val extraPatterns: List<ChunkPattern> = emptyList(),
 )
 
 data class OutputOptions(
@@ -79,6 +88,17 @@ class OptimizerRequestBuilder internal constructor(
         set(value) {
             filter = filter.copy(strict = value)
         }
+
+    var extraPatterns: List<ChunkPattern>
+        get() = filter.extraPatterns
+        set(value) {
+            filter = filter.copy(extraPatterns = value)
+        }
+
+    /** Append one keep pattern to the built-in force-load + InhabitedTime patterns. */
+    fun addPattern(pattern: ChunkPattern) {
+        filter = filter.copy(extraPatterns = filter.extraPatterns + pattern)
+    }
 
     var inPlace: Boolean
         get() = outputOptions.inPlace

@@ -1,5 +1,6 @@
 package com.jokerhub.orzmc.world
 
+import com.jokerhub.orzmc.patterns.ChunkPattern
 import com.jokerhub.orzmc.patterns.InhabitedTimePattern
 import com.jokerhub.orzmc.patterns.ListPattern
 import java.io.IOException
@@ -30,6 +31,7 @@ internal data class DimensionContext(
     val syncOnFinalize: Boolean = true,
     val record: (Path, String, String) -> Unit,
     val progress: ProgressTracker,
+    val extraPatterns: List<ChunkPattern>,
 )
 
 /**
@@ -200,6 +202,7 @@ object DefaultOptimizer : OptimizerEngine {
                 syncOnFinalize = request.io.syncOnFinalize,
                 record = { p, k, m -> record(p, k, m) },
                 progress = progressTracker,
+                extraPatterns = request.filter.extraPatterns,
             )
 
         val removedTotal = processDimensions(ctx, tasks)
@@ -332,7 +335,7 @@ object DefaultOptimizer : OptimizerEngine {
             listOf(
                 ListPattern(forced),
                 InhabitedTimePattern(ctx.ticks, ctx.removeUnknown),
-            )
+            ) + ctx.extraPatterns
         val startProcessed = ctx.progress.processed.get()
         val result =
             DimensionProcessor.process(
