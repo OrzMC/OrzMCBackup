@@ -52,7 +52,7 @@
 
 - 新增安装方式：`cargo install rust-thanos`；作为库使用：`rust-thanos = "0.0.4"`。
 - 预编译二进制与 Homebrew 名称不变，但**发布页迁移**到 <https://github.com/OrzMC/OrzMCBackup/releases>
-  （旧仓 `OrzMC/rust-thanos` 已归档），资产名统一为 `rust-thanos-<version>-<target>.tar.gz|.zip`。
+  （旧仓已归档到 `OrzGeeker/rust-thanos`），资产名统一为 `rust-thanos-<version>-<target>.tar.gz|.zip`。
 - ⚠️ **行为变更**：`rust-thanos backup /world /world`（输出与输入相同）现在**直接报错退出**，
   不再交互询问"是否覆盖"。旧版若答 `y` 会先 `remove_dir_all(输出)`，然后才跑到重叠守卫 ——
   等于**删掉源世界**。脚本里依赖旧行为的请改用临时目录或 `--in-place`。
