@@ -1,0 +1,13 @@
+{
+  "vector": "inhabited-nested",
+  "title": "inhabited-nested",
+  "command": "backup",
+  "clauses": [
+    "WOS-3.1",
+    "WOS-3.4"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

@@ -1,6 +1,7 @@
 package com.jokerhub.orzmc.world
 
 import com.jokerhub.orzmc.FailingFileSystem
+import com.jokerhub.orzmc.mca.ChunkNbtScanner
 import com.jokerhub.orzmc.mca.McaEntry
 import com.jokerhub.orzmc.util.CompressionKind
 import com.jokerhub.orzmc.util.McaMemoryBuilder
@@ -10,8 +11,6 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.file.Path
 
 class WorldMergerTest {
@@ -676,7 +675,7 @@ class WorldMergerTest {
         slot: Int,
     ): Long? {
         val payload = readPayload(world, kind, name, slot) ?: return null
-        return ByteBuffer.wrap(payload, payload.size - 8, 8).order(ByteOrder.BIG_ENDIAN).long
+        return ChunkNbtScanner.findInhabitedTime(payload)
     }
 }
 

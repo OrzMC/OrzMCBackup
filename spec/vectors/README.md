@@ -44,6 +44,7 @@
 | `custom-compression` | WOS-2.6 | `CUSTOM(127)` 无法解压 → 安全保留 |
 | `forceload-corrupt` | WOS-4.4 | 强制加载文件损坏 → 视为无强制加载，正常按阈值处理 |
 | `decompress-bomb` | WOS-10.2 | 65 MiB 解压炸弹 → 安全保留、不 OOM |
+| `inhabited-nested` | WOS-3.1/3.4 | 根层/`Level` 兼容；`structures` 里的同名诱饵 tag 必须忽略 |
 
 > 反证：`forceload-forced` 的 3 个 packed long 若按旧的「两个 long 拼一个坐标」解释，会得到
 > `(5,1)` 一个坐标并丢掉最后一项 → 保留槽位变成 `{37}`，与期望 `{5,65,650}` 不符，向量必红。

@@ -1330,6 +1330,82 @@ def vector_decompress_bomb(force: bool) -> None:
     print(f"generated {name}")
 
 
+
+# ---------------------------------------------------------------- vector 22
+
+
+def nbt_str(name: str) -> bytes:
+    raw = name.encode()
+    return struct.pack(">H", len(raw)) + raw
+
+
+def nbt_long_tag(name: str, value: int) -> bytes:
+    return b"\x04" + nbt_str(name) + struct.pack(">q", value)
+
+
+def nbt_compound(entries: bytes) -> bytes:
+    return entries + b"\x00"
+
+
+def nbt_compound_tag(name: str, entries: bytes) -> bytes:
+    return b"\x0a" + nbt_str(name) + nbt_compound(entries)
+
+
+def nbt_root(entries: bytes) -> bytes:
+    return b"\x0a" + struct.pack(">H", 0) + nbt_compound(entries)
+
+
+def vector_inhabited_nested(force: bool) -> None:
+    """WOS-3.1/3.4: only root-level (or root.Level) InhabitedTime counts; nested decoys are ignored."""
+    name = "inhabited-nested"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    # slot 0: a decoy InhabitedTime=999999 inside `structures` appears BEFORE the real root tag (0).
+    #         A byte scan keeps this chunk; the spec says drop it.
+    decoy = nbt_compound_tag("structures", nbt_long_tag("InhabitedTime", 999_999))
+    slot0 = nbt_root(decoy + nbt_long_tag("InhabitedTime", 0))
+    # slot 1: legacy (<=1.17) layout: root.Level.InhabitedTime = 7000 -> kept
+    slot1 = nbt_root(nbt_compound_tag("Level", nbt_long_tag("InhabitedTime", 7_000)))
+
+    entries = [
+        {"index": 0, "method": METHOD_ZLIB, "data": zlib_data(slot0), "mtime": 1_650_000_000},
+        {"index": 1, "method": METHOD_ZLIB, "data": zlib_data(slot1), "mtime": 1_650_000_001},
+    ]
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "inhabited-nested", "command": "backup",
+             "clauses": ["WOS-3.1", "WOS-3.4"], "args": ["--inhabited-time-seconds", "300"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(entries, [1])},
+        {"path": "level.dat", "sha256": mca.sha256(b"level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-3.1（`InhabitedTime` 在 chunk 根；≤1.17 为 `root.Level`）、",
+        "WOS-3.4（只接受根层或 `root.Level` 的同名 tag，其它嵌套必须忽略；无法解析时安全保留）", "",
+        "## 输入", "",
+        "- 槽位 0：`structures` 子 compound 里先出现一个 **诱饵** `InhabitedTime=999999`，",
+        "  真正的根层 `InhabitedTime=0` 在其后",
+        "- 槽位 1：旧版布局 `Level.InhabitedTime=7000`", "",
+        "## 期望", "",
+        "- 只保留槽位 {1}：槽位 0 的根层值为 0（诱饵必须被忽略）；槽位 1 走 `Level` 兼容路径",
+        "- 反证：纯字节扫描会把槽位 0 判为 999999（保留）→ 本向量变红", "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
 # ---------------------------------------------------------------- shared
 
 
@@ -1444,6 +1520,7 @@ def main() -> int:
     vector_merge_overlap(args.force)
     vector_forceload_corrupt(args.force)
     vector_decompress_bomb(args.force)
+    vector_inhabited_nested(args.force)
     return 0
 
 

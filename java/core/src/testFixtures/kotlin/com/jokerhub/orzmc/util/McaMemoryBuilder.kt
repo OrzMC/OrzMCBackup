@@ -18,9 +18,15 @@ object McaMemoryBuilder {
         val kind: CompressionKind,
     )
 
+    /**
+     * Minimal chunk NBT: a root compound (1.18+ layout) holding one `InhabitedTime` LONG.
+     * The root header matters: the scanner accepts the tag only at the chunk root or at
+     * `root.Level` (WOS-3.1/WOS-3.4), never in arbitrary bytes.
+     */
     private fun inhabitedTag(value: Long): ByteArray {
         val name = "InhabitedTime".toByteArray()
         val out = ByteArrayOutputStream()
+        out.write(byteArrayOf(0x0A, 0x00, 0x00)) // TAG_Compound + empty root name
         out.write(byteArrayOf(4))
         val bb = ByteBuffer.allocate(2).order(ByteOrder.BIG_ENDIAN)
         bb.putShort(name.size.toShort())
@@ -29,6 +35,7 @@ object McaMemoryBuilder {
         val vb = ByteBuffer.allocate(8).order(ByteOrder.BIG_ENDIAN)
         vb.putLong(value)
         out.write(vb.array())
+        out.write(byteArrayOf(0x00)) // TAG_End (root)
         return out.toByteArray()
     }
 

@@ -18,6 +18,10 @@
   重叠拒绝、报告字段语义、`--dry-run` 零写入。
 
 ### 修复
+- **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
+  `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；
+  原先的纯字节前缀搜索会命中第一个匹配的字节序列，可能把该删的区块留下（或反之）。
+  两实现同步修正，向量 `inhabited-nested` 回归。
 - legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
 - **Rust CLI 的输入/输出重叠不再可能删掉源世界**：`rust-thanos backup /world /world` 原会先问
   "是否覆盖"、答 `y` 即 `remove_dir_all(/world)`，之后才跑到重叠守卫。现在重叠守卫在任何提示/删除

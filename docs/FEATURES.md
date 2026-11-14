@@ -102,8 +102,10 @@ Minecraft Java 版世界优化工具，双用途：
 
 - 基于 `InhabitedTime` NBT long 值做 `>` 比较（严格大于，非 >=）
 - **`threshold=0` 时移除未被玩家访问过的区块**（即 `InhabitedTime == 0`）
-- **字节级扫描**：搜索 `[TAG_Long(1)][name_length(2)]["InhabitedTime"(13)]` 模式，直接读后面 8 字节
-  - 无需完整 NBT 反序列化，性能更高
+- **结构感知扫描（`ChunkNbtScanner`）**：只遍历 chunk 根 compound、按长度跳过 payload（不做完整反序列化），
+  只接受根层（1.18+）或 `root.Level`（≤1.17）的 `InhabitedTime`；其它嵌套的同名 tag 一律忽略
+  - 早期实现是纯字节前缀搜索，理论上会被嵌套同名 tag（`structures`、模组数据）干扰；现已由
+    `spec/vectors/inhabited-nested` 回归
 - `removeUnknown` 标志控制外部压缩/不可解析区块的处理
 
 ### 4.2 `ListPattern` — 坐标列表模式

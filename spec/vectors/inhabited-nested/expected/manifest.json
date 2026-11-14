@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "level.dat",
+      "sha256": "0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 1,
+          "modified_time": 1650000001,
+          "payload_sha256": "f4c8ba8ae1c0055368e2dc55bde2f88d07b3f808a4913c8d95272919d905104a"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "inhabited-nested"
+}

@@ -1,15 +1,15 @@
 package com.jokerhub.orzmc.patterns
 
+import com.jokerhub.orzmc.mca.ChunkNbtScanner
 import com.jokerhub.orzmc.mca.McaEntry
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 
 /**
  * Pattern that keeps chunks whose `InhabitedTime` NBT value meets the threshold.
  *
- * Uses a fast byte-level scan of the decompressed chunk data to locate the
- * `InhabitedTime` long field without a full NBT parse. External-compressed
- * and unparseable chunks are handled according to [removeUnknown].
+ * Reads the value with [ChunkNbtScanner], which walks only the chunk root compound: the tag is
+ * accepted at the root (1.18+) or at `root.Level` (≤1.17) and **ignored** anywhere else
+ * (WOS-3.1/WOS-3.4). External-compressed and unparseable chunks are handled according to
+ * [removeUnknown].
  *
  * A chunk is kept when its `InhabitedTime` is **strictly greater than**
  * [threshold] (>, not >=). This means setting [threshold] to 0 removes chunks
@@ -28,37 +28,7 @@ class InhabitedTimePattern(
         if (entry.isExternal()) return !removeUnknown
         val data = entry.allDataUncompressed()
         if (data.isEmpty()) return !removeUnknown
-        val t = findInhabitedFast(data)
+        val t = ChunkNbtScanner.findInhabitedTime(data)
         return t?.let { it > threshold } ?: (!removeUnknown)
-    }
-
-    companion object {
-        private const val LONG_TAG: Byte = 4
-
-        private fun findInhabitedFast(data: ByteArray): Long? {
-            val name = "InhabitedTime".toByteArray()
-            val prefix = ByteArray(1 + 2 + name.size)
-            prefix[0] = LONG_TAG
-            val bb = ByteBuffer.wrap(prefix, 1, 2).order(ByteOrder.BIG_ENDIAN)
-            bb.putShort(name.size.toShort())
-            System.arraycopy(name, 0, prefix, 3, name.size)
-            val plen = prefix.size
-            var i = 0
-            while (i + plen + 8 <= data.size) {
-                var match = true
-                for (j in 0 until plen) {
-                    if (data[i + j] != prefix[j]) {
-                        match = false
-                        break
-                    }
-                }
-                if (match) {
-                    val v = ByteBuffer.wrap(data, i + plen, 8).order(ByteOrder.BIG_ENDIAN).long
-                    return v
-                }
-                i++
-            }
-            return null
-        }
     }
 }

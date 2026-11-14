@@ -41,13 +41,18 @@
 
 ## 3. chunk 数据的使用（WOS-3）
 
-- **WOS-3.1** `InhabitedTime` `MUST` 为 chunk 根 compound 上的 `LONG`（tag id 4），单位 game tick。
+- **WOS-3.1** `InhabitedTime` `MUST` 为 `LONG`（tag id 4），单位 game tick；位置为 chunk 根 compound
+  （1.18+）或 `root.Level.InhabitedTime`（≤1.17）。`conformance: inhabited-nested`
 - **WOS-3.2** 阈值比较 `MUST` 为**严格大于**（`InhabitedTime > threshold`）；因此 `threshold = 0` 会移除
   所有从未被 tick 过的区块。
 - **WOS-3.3** 缺失 `InhabitedTime`、解压失败或数据为空：`MUST NOT` 视为"可删除"，除非 `removeUnknown`
   为真；`removeUnknown = false` 时 `MUST` 保留。
-- **WOS-3.4** 查找 `InhabitedTime` `MAY` 采用字节前缀搜索以省去完整 NBT 解析，但**读到的值若无法解释，
-  `MUST` 走安全保留**（等价于 WOS-3.3）。
+- **WOS-3.4** 取值位置 `MUST` 限制为「根层」或「`root.Level`」；其它嵌套里的同名 tag（例如 `structures`、
+  block entity、模组自定义数据）`MUST` 被忽略 —— 否则一段凑巧的字节序列就能决定区块去留。
+  实现 `MAY` 采用跳过式扫描（只走根 compound、按长度跳过 payload，不做完整反序列化），但
+  `MUST` 校验结构；NBT 无法解析时按 WOS-3.3 安全保留。`conformance: inhabited-nested`
+  `impl:` java `mca/ChunkNbtScanner.kt` / rust `patterns/inhabited.rs` / upstream `divergent`
+  （上游为纯字节前缀搜索，会命中嵌套同名 tag）
   `impl:` java `patterns/InhabitedTimePattern.kt` / rust `patterns/inhabited.rs` / upstream `Pattern/InhabitedTimePattern.php`
 
 ## 4. 强制加载区块（WOS-4）
@@ -184,6 +189,7 @@
 | `vectors/merge-overlap/` | WOS-8.1（merge 三目录互斥） | ✅ 已落地 |
 | `vectors/forceload-corrupt/` | WOS-4.4（强制加载解析失败） | ✅ 已落地 |
 | `vectors/decompress-bomb/` | WOS-10.2（解压上限安全路径） | ✅ 已落地 |
+| `vectors/inhabited-nested/` | WOS-3.1/3.4（根层与 `Level` 兼容，嵌套同名 tag 忽略） | ✅ 已落地 |
 
 ## 条款覆盖（机器生成）
 
@@ -196,7 +202,7 @@ python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未�
 
 | 类别 | 条款 | 说明 |
 |---|---|---|
-| 待补向量 | WOS-3.4（同一 chunk 出现两个 `InhabitedTime` 时的取值口径——需要先决定语义）、WOS-10.3（删除不跟随符号链接——需构造跨链接删除场景） | 语义或夹具成本较高 |
+| 待补向量 | WOS-10.3（删除不跟随符号链接——需构造跨链接删除场景） | 夹具成本较高（破坏性场景） |
 | 库 API | WOS-5.4（注入自定义保留模式） | 各实现 API 不同（Java `extraPatterns` / Rust `--keep-range`/`pattern()`），属 WOS-11 实现定义，不做跨语言断言 |
 | 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现 |
 

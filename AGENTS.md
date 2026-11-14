@@ -130,7 +130,8 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 3. **进度报告**：两种限流——按区块数（`progressInterval`）或按时间（`progressIntervalMs`，优先）。
 4. **可扩展性**：`parallelism` 驱动 region 层并行（每个任务一个 `.mca`）；维度按序处理，避免并行度平方
    （A5 后不再有维度级并行）。
-5. **快速 InhabitedTime 检查**：字节级扫描 NBT 标签，不完整反序列化。
+5. **InhabitedTime 结构感知扫描**：只走 chunk 根 compound（按长度跳过 payload，不做完整反序列化），
+   只接受根层或 `root.Level` 的 tag（WOS-3.4），嵌套同名 tag 一律忽略。
 6. **惰性 MCA 写入**：仅当至少保留一个区块才创建输出 writer，避免空 MCA 文件。
 7. **26.1+ 兼容**：ForceLoad 探测 `chunk_tickets.dat` → `chunks.dat`；维度发现递归支持 `dimensions/` 嵌套；
    `discoverMiscParents` 自动发现 world 级杂项源，确保 `level.dat`/`players/`/`data/` 等在直接传入世界目录时也正确复制。
