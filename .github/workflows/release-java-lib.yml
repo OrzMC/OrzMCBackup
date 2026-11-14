@@ -72,8 +72,19 @@ jobs:
           test -s java/core/build/portal-bundle.zip || { echo "missing portal-bundle.zip"; exit 1; }
           unzip -t java/core/build/portal-bundle.zip
           sha256sum java/core/build/portal-bundle.zip
-      - name: Upload bundle to Central Portal
+      - name: Skip when this version is already published
+        id: already
         if: github.event_name == 'push'
+        run: |
+          url="https://repo1.maven.org/maven2/io/github/wangzhizhou/backup-core/${VERSION}/backup-core-${VERSION}.pom"
+          if curl -fsS -o /dev/null "$url"; then
+            echo "::notice::backup-core ${VERSION} is already live on Maven Central; skipping the upload (idempotent re-run)."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Upload bundle to Central Portal
+        if: github.event_name == 'push' && steps.already.outputs.skip != 'true'
         env:
           CENTRAL_TOKEN: ${{ secrets.CENTRAL_TOKEN }}
           CENTRAL_PORTAL_UPLOAD_URL: ${{ secrets.CENTRAL_PORTAL_UPLOAD_URL }}
@@ -146,7 +157,14 @@ jobs:
           if [ "$published" -eq 1 ]; then
             echo "✅ Portal publish succeeded (deployment $DEPLOYMENT_ID)"
           else
-            echo "❌ timeout waiting for Portal status (deployment $DEPLOYMENT_ID)"
-            exit 1
+            # v0.3.2 实测：PUBLISHING 阶段可超过 20 分钟窗口（deployment 无 errors，Central 后端慢）。
+            # 超时本身不代表失败，因此先用 Maven Central 的实际产物做最终判据，避免假阴性。
+            live="https://repo1.maven.org/maven2/io/github/wangzhizhou/backup-core/${VERSION}/backup-core-${VERSION}.pom"
+            if curl -fsS -o /dev/null "$live"; then
+              echo "::notice::Portal status timed out (deployment $DEPLOYMENT_ID) but ${VERSION} is already live on Maven Central — treating as success."
+            else
+              echo "❌ timeout waiting for Portal status (deployment $DEPLOYMENT_ID) and ${VERSION} is not on Maven Central yet"
+              exit 1
+            fi
           fi
       - run: java/gradlew -p java --stop
