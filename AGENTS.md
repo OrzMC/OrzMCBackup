@@ -174,6 +174,7 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 - `spec/SPEC.md` — **语言无关行为规范**（条款 WOS-###，实现必须对齐）
 - `spec/vectors/` — 一致性向量 7 个（`input/` + `params.json` + `expected/manifest.json`）；`spec/tools/` 中立读取/比较器
 - `spec/divergences.md` / `spec/upstream-divergences.md` — 允许的分歧 / 与官方 PHP 的对照
+- `spec/upstream-proposals.md` — 提交给上游的改进与分歧（含链接、证据与跟踪状态）
 - `rust/README.md` — Rust 域构建、测试与发布
 - `upstream/README.md` — 官方 PHP 子模块的只读使用与升级流程
 - `docs/FEATURES.md` — 功能点全量梳理（v0.3.0）

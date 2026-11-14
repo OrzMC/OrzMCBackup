@@ -83,6 +83,17 @@
 
 ---
 
+## 4.5 已提交上游的改进与分歧
+
+逐条依据、证据链与跟踪状态见 [`upstream-proposals.md`](upstream-proposals.md)。摘要：
+
+| 项 | 上游链接 | 类型 |
+|---|---|---|
+| 不复制 `session.lock` | [PR #28](https://github.com/aternosorg/thanos/pull/28) | 改进（无争议） |
+| Anvil 位置表溢出守卫 | [PR #29](https://github.com/aternosorg/thanos/pull/29) | 改进（无争议） |
+| legacy `Forced` 的 X/Z 高低位 | [issue #30](https://github.com/aternosorg/thanos/issues/30) | 分歧（需上游确认真实夹具） |
+| `InhabitedTime` 结构化取值 | [issue #31](https://github.com/aternosorg/thanos/issues/31) | 分歧（性能取舍待上游定） |
+
 ## 5. 有意保留的差异（不回退到上游行为）
 
 | 差异 | 上游 | 本项目 | 理由 |
