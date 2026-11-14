@@ -24,7 +24,7 @@ jobs:
       run:
         working-directory: rust
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Ensure tag matches rust/Cargo.toml version
         run: |
           ver=$(grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
@@ -74,7 +74,7 @@ jobs:
             archive_ext: zip
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine product name
         id: product
@@ -83,7 +83,7 @@ jobs:
           echo "product_name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Set up Rust toolchain
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
 
@@ -124,7 +124,7 @@ jobs:
           fi
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: tarball-${{ matrix.target }}
           path: rust/${{ steps.product.outputs.product_name }}-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_ext }}
@@ -138,7 +138,7 @@ jobs:
       sha_linux_x64: ${{ steps.compute-sha.outputs.sha_linux_x64 }}
       sha_linux_arm64: ${{ steps.compute-sha.outputs.sha_linux_arm64 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Determine product name
         id: product
@@ -146,7 +146,7 @@ jobs:
           echo "product_name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
 
       - name: Download build artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: tarball-*
           merge-multiple: true
@@ -177,11 +177,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout main repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           path: main
       - name: Set up Rust toolchain (for formula bins)
-        uses: actions-rust-lang/setup-rust-toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
       - name: Determine product name
@@ -234,7 +234,7 @@ jobs:
             exit 1
           fi
       - name: Checkout tap repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           repository: ${{ steps.tap.outputs.repo }}
           token: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}
