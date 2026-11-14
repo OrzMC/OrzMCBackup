@@ -52,6 +52,16 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
       - name: Verify lockfile
         run: cargo check --locked
+      - name: License copy in sync
+        # rust/LICENSE 是 cargo 打包所需的副本（cargo 不能引用包目录外的文件）；
+        # 漂移会让 crates.io 上的许可文本与仓库不一致。
+        shell: bash
+        run: |
+          if ! cmp -s ../LICENSE LICENSE; then
+            echo "::error::rust/LICENSE 与仓库根 LICENSE 不一致——改许可时两份都要更新"
+            diff ../LICENSE LICENSE || true
+            exit 1
+          fi
       - name: Build
         run: cargo build --verbose
       - name: Test

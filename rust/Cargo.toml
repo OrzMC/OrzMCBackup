@@ -1,8 +1,8 @@
 [package]
 name = "rust-thanos"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
-license = "MIT"
+license = "Apache-2.0"
 description = "An efficient Minecraft Java world optimization tool to detect and remove unused chunks"
 repository = "https://github.com/OrzMC/OrzMCBackup"
 documentation = "https://github.com/OrzMC/OrzMCBackup/tree/main/rust"

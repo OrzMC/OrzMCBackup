@@ -1,6 +1,6 @@
 # rust-thanos（OrzMCBackup 的 Rust 域）
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://github.com/OrzMC/OrzMCBackup/blob/main/LICENSE)
 [![rust](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml)
 
 > 本目录是 [OrzMCBackup](https://github.com/OrzMC/OrzMCBackup) 单仓中的 **Rust 域**（原独立仓库
@@ -357,7 +357,8 @@ Homebrew 公式支持 macOS 与 Linux；发布流程自动为 macOS（arm64/x64�
 
 ## 📄 许可证
 
-MIT — 查看 [LICENSE](LICENSE)。
+Apache-2.0 — 查看 [LICENSE](LICENSE)（与仓库根 `LICENSE` 同文，`rust/` 内这份副本是 cargo 打包所需；
+CI 有 `cmp` 校验防止漂移）。
 
 ## 📞 相关链接
 
