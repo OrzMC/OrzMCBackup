@@ -394,5 +394,7 @@ Homebrew 公式由 `release-rust.yml` 的 `update-homebrew-tap` 作业自动渲�
 
 - 参与开发：[`CONTRIBUTING.md`](CONTRIBUTING.md)
 - 安全问题：[`SECURITY.md`](SECURITY.md)
-- 许可：[Apache-2.0](LICENSE)。感谢社区与原实现（[Aternos/Thanos](https://github.com/aternosorg/thanos)）
-  的启发与样例支持
+- 许可：**全仓 [Apache-2.0](LICENSE)**（`java/` 与 `rust/` 域一致，Maven / crates.io 元数据同口径）。
+  `rust/LICENSE` 是 cargo 打包所需的同文副本，CI 有 `cmp` 校验防止漂移。
+  上游参考实现 [Aternos/Thanos](https://github.com/aternosorg/thanos) 为 **MIT**，仅以只读子模块
+  `upstream/thanos/` 引用，不参与构建、不进入发布产物。感谢其启发与样例数据支持

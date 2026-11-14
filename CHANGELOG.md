@@ -1,5 +1,17 @@
 # Changelog
 
+## rust-v0.0.5 (2026-11-15)
+
+### 许可口径统一（本次唯一的变更）
+
+- **Rust 域改为 Apache-2.0**：`rust/Cargo.toml` 的 `license` 由 `MIT` 改为 `Apache-2.0`，`rust/LICENSE`
+  换为与仓库根同文的 Apache-2.0 副本（CI 用 `cmp` 校验两份不漂移）。此前"仓库 README / Java 域说
+  Apache-2.0、Rust crate 说 MIT"是历史遗留的口径分裂。
+- **对既有版本的影响**：crates.io 上的 `rust-thanos 0.0.4` 及更早版本已按 MIT 发布，**元数据不可回溯修改**；
+  自 **0.0.5 起**为 Apache-2.0。已发布版本的 MIT 授权继续有效（MIT 不可撤销，老用户不受影响）。
+- **无代码/行为变更**：命令行参数、输出字节、`spec/` 一致性向量全部不变，不需要迁移。
+  用 Homebrew 装的同学 `brew upgrade rust-thanos` 即可看到 0.0.5（公式与 sha256 由流水线自动更新）。
+
 ## v0.3.2 (2026-11-15)
 
 ### 行为变更（用户可见）

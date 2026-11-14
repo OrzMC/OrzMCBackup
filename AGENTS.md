@@ -45,6 +45,9 @@ Java 域双用途：CLI（picocli Shadow JAR）+ 库（Maven Central `io.github.
 
 - `spec/` 是行为真值：任何可观察行为变更先改 spec（条款 + 向量），再改 `java/`、`rust/`
 - `upstream/thanos` 只读：不修改、不参与构建；升级需评审式改指针并在 `spec/upstream-divergences.md` 记录
+- **许可口径唯一：Apache-2.0**（两个域 + 两种分发元数据同口径）。`rust/LICENSE` 是 cargo 打包所需的同文副本，
+  改许可必须同时更新根 `LICENSE` 与 `rust/LICENSE`（`rust.yml` 的 `cmp` 步骤会拦）。
+  上游 PHP 是 MIT，只以只读子模块存在，不进入产物，因此无需在产物里附带其许可文本
 
 ## 常用命令
 
