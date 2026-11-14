@@ -205,12 +205,14 @@ python3 spec/tools/coverage.py            # 条款 ↔ 向量 矩阵（report-on
 python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未来可接 CI）
 ```
 
-当前：**53 条条款，42 条被向量覆盖**。未覆盖的 11 条分三类：
+当前（2026-11-14）：**54 条条款，48 条被向量覆盖（23 个向量）**。未覆盖的 6 条分两类：
 
 | 类别 | 条款 | 说明 |
 |---|---|---|
 | 库 API | WOS-5.4（注入自定义保留模式） | 各实现 API 不同（Java `extraPatterns` / Rust `--keep-range`/`pattern()`），属 WOS-11 实现定义，不做跨语言断言 |
-| 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现 |
+| 元条款 | WOS-12.1–12.5 | 描述一致性方法本身（含"上游也在门禁内"），由 `tools/*` 与 CI 实现 |
+
+> 该段落容易随条款增加而过期；以 `python3 spec/tools/coverage.py` 的输出为准（CI 里 report-only 打印）。
 
 ## 变更流程
 

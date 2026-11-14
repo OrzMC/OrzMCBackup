@@ -1,6 +1,6 @@
 # OrzMCBackup 功能点梳理
 
-> 基于 v0.3.1 代码库，2026-08 版
+> 基于 v0.3.1 代码库；2026-11 增补：单仓多语言（`spec/`+`java/`+`rust/`）、一致性向量与门禁、`merge --dry-run`、QoI（损坏 region 保留、`InhabitedTime` 结构化扫描）
 
 ## 一、项目定位
 
