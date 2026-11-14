@@ -36,10 +36,9 @@ jobs:
         uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
-          rustflags: ""
           components: clippy, rustfmt
           # v2 默认 rustflags: -D warnings；cargo 新增的 dependency lint 会把它变成硬失败。
-          # 本项目的一致性/风格门禁由 rustfmt + clippy(-D warnings) 显式负责。
+          # 风格/lint 门禁由 rustfmt + clippy(-D warnings) 显式负责。
           rustflags: ""
       - uses: Swatinem/rust-cache@v2
         with:
