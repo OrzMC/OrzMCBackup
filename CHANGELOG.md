@@ -169,7 +169,7 @@
 
 ### Quality Gate
 - **koverVerify 绑定 `check`**：core/app 均加 `tasks.check { dependsOn("koverVerify") }`，
-  coverage 阈值（core 75% / app 50%）不达标时 `./gradlew check` 直接失败，门禁不再可被绕过。
+  coverage 阈值（core 75% / app 50%）不达标时 `java/gradlew -p java check` 直接失败，门禁不再可被绕过。
 
 ### CI (C1–C4 / C9–C11)
 - **test-matrix**：macOS 裁剪为单 JDK（C1）；JDK 矩阵降为 `['17','21']`（C2）；push 仅触发 main +

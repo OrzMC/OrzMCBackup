@@ -1,20 +1,20 @@
-name: test-matrix
+name: java
 
 on:
   push:
     branches:
       - main
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
+    paths:
+      - 'java/**'
+      - '.github/workflows/java.yml'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
-      - '*.md'
+    paths:
+      - 'java/**'
+      - '.github/workflows/java.yml'
 
 # P1-C3: 同一 ref 的旧 run 直接取消，避免 push 刷新时 2× 矩阵叠加跑
 concurrency:
-  group: test-matrix-${{ github.ref }}
+  group: java-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
           java-version: 25
       - uses: gradle/actions/setup-gradle@v6.4.0
       - name: Run ktlint and detekt
-        run: bash tools/ci-retry.sh ./gradlew ktlintCheck detekt --no-daemon
+        run: bash tools/ci-retry.sh java/gradlew -p java ktlintCheck detekt --no-daemon
   ubuntu-tests:
     runs-on: ubuntu-latest
     strategy:
@@ -53,19 +53,19 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v6.4.0
       - name: Run tests on ${{ matrix.java }}
-        run: bash tools/ci-retry.sh ./gradlew :core:test :app:test --no-daemon
+        run: bash tools/ci-retry.sh java/gradlew -p java :core:test :app:test --no-daemon
       # P1-C4: coverage 并入矩阵的 Java 17 job，复用同一步已跑的 test 结果，
       # 不再单开 coverage job 二次运行整套套件。
       - name: Generate and verify coverage (Java 17 only)
         if: matrix.java == '17'
-        run: bash tools/ci-retry.sh ./gradlew :core:koverXmlReport :core:koverVerify :app:koverXmlReport :app:koverVerify --no-daemon
+        run: bash tools/ci-retry.sh java/gradlew -p java :core:koverXmlReport :core:koverVerify :app:koverXmlReport :app:koverVerify --no-daemon
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-report-ubuntu-${{ matrix.java }}
           path: |
-            core/build/reports/tests/
+            java/core/build/reports/tests/
             app/build/reports/tests/
       - name: Upload coverage report (Java 17 only)
         if: matrix.java == '17'
@@ -73,7 +73,7 @@ jobs:
         with:
           name: coverage-report
           path: |
-            core/build/reports/kover/
+            java/core/build/reports/kover/
             app/build/reports/kover/
       - name: Upload to CodeCov (Java 17 only)
         # Skip on dependabot runs where CODECOV_TOKEN is not available.
@@ -81,7 +81,7 @@ jobs:
         uses: codecov/codecov-action@v7
         with:
           files: |
-            core/build/reports/kover/report.xml
+            java/core/build/reports/kover/report.xml
             app/build/reports/kover/report.xml
           token: ${{ secrets.CODECOV_TOKEN }}
           slug: OrzMC/OrzMCBackup
@@ -103,14 +103,14 @@ jobs:
       - uses: gradle/actions/setup-gradle@v6.4.0
       - name: Run tests on Windows Java ${{ matrix.java }}
         shell: bash
-        run: bash tools/ci-retry.sh ./gradlew :core:test :app:test --no-daemon
+        run: bash tools/ci-retry.sh java/gradlew -p java :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-report-windows-${{ matrix.java }}
           path: |
-            core/build/reports/tests/
+            java/core/build/reports/tests/
             app/build/reports/tests/
   macos-tests:
     runs-on: macos-latest
@@ -129,12 +129,12 @@ jobs:
           java-version: ${{ matrix.java }}
       - uses: gradle/actions/setup-gradle@v6.4.0
       - name: Run tests on macOS Java ${{ matrix.java }}
-        run: bash tools/ci-retry.sh ./gradlew :core:test :app:test --no-daemon
+        run: bash tools/ci-retry.sh java/gradlew -p java :core:test :app:test --no-daemon
       - name: Upload test report
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: test-report-macos-${{ matrix.java }}
           path: |
-            core/build/reports/tests/
+            java/core/build/reports/tests/
             app/build/reports/tests/

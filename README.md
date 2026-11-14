@@ -1,8 +1,9 @@
 # OrzMCBackup
 
-[![release-lib](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml)
-[![release-app](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml)
-[![test-matrix](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml)
+[![java](https://github.com/OrzMC/OrzMCBackup/actions/workflows/java.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/java.yml)
+[![rust](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml)
+[![release-java-app](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-app.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-app.yml)
+[![release-java-lib](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-lib.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-lib.yml)
 [![codecov](https://codecov.io/gh/OrzMC/OrzMCBackup/branch/main/graph/badge.svg)](https://codecov.io/gh/OrzMC/OrzMCBackup)
 [![license](https://img.shields.io/badge/license-Apache%202.0-blue)](LICENSE)
 [![GitHub Pages](https://img.shields.io/badge/GitHub%20Pages-live-238636)](https://orzmc.github.io/OrzMCBackup/)
@@ -10,13 +11,15 @@
 > **Minecraft Java 世界优化与备份工具**：按玩家活跃时间（InhabitedTime）逐区块裁剪世界体积，
 > 让备份从 18.6GB 缩到 2.2GB，并提供优化备份与全量备份的槽位级合并恢复。
 
-CLI 工具 + Kotlin/Java 库双形态，支持 PaperMC 26.1+ 新世界格式，专注**数据安全**（强制加载保护、
-entities/poi 锁步、零非预期丢失）。
+**多语言单仓**：同一套方案由 `java/`（Kotlin，CLI + Maven Central 库）与 `rust/`（Rust CLI/lib）两份实现，
+共享语言无关的规范 `spec/`（条款 + 一致性向量），官方 PHP `upstream/thanos` 作为只读参考。
+支持 PaperMC 26.1+ 新世界格式，专注**数据安全**（强制加载保护、entities/poi 锁步、零非预期丢失）。
 
 ---
 
 ## 目录
 
+- [仓库结构](#仓库结构)
 - [为什么需要](#为什么需要)
 - [核心特性](#核心特性)
 - [快速开始](#快速开始)
@@ -29,6 +32,22 @@ entities/poi 锁步、零非预期丢失）。
 - [构建与发布](#构建与发布)
 - [Agent 协作开发](#agent-协作开发)
 - [贡献 / 安全 / 许可](#贡献--安全--许可)
+
+---
+
+## 仓库结构
+
+| 目录 | 内容 |
+|---|---|
+| `spec/` | **语言无关规范**（条款 WOS-###）+ 一致性测试向量 + 中立比较器 —— 唯一行为真值 |
+| `java/` | Kotlin/JVM 实现：`core`（Maven Central 库）+ `app`（CLI Shadow JAR） |
+| `rust/` | Rust 实现：Cargo crate，CLI + lib |
+| `upstream/thanos/` | 官方 PHP `aternosorg/thanos`（submodule，**只读参考**，不参与构建） |
+| `docs/` | 产品文档（基准、案例、市场分析、与上游的差异对照） |
+| `tools/` | 仓库级脚本（夹具生成、CI 重试） |
+
+命令入口：`java/gradlew -p java <task>`（Gradle 根在 `java/`）、`cd rust && cargo test`。
+两个实现的可观察行为由 `scripts/conformance.sh` 按 `spec/vectors` 校验。
 
 ---
 
@@ -80,26 +99,26 @@ Minecraft 区块一旦生成就不会自动消失。玩家探索、跑图、飞�
 ### 构建
 
 ```bash
-./gradlew :app:shadowJar --no-daemon
+java/gradlew -p java :app:shadowJar --no-daemon
 ```
 
-产物：`app/build/libs/backup.jar`（文件名固定；版本号写入 manifest，`--version` 可查）。
+产物：`java/app/build/libs/backup.jar`（文件名固定；版本号写入 manifest，`--version` 可查）。
 本地默认版本 `0.1.0`；用 `-Pversion=X.Y.Z` 注入（如 `-Pversion=0.3.1`）。
 
 ### 优化备份
 
 ```bash
 # 指定输入与输出目录，按 5 分钟活跃阈值裁剪
-java -jar app/build/libs/backup.jar /path/to/world /path/to/out -t 300 --zip-output
+java -jar java/app/build/libs/backup.jar /path/to/world /path/to/out -t 300 --zip-output
 
 # 原地处理（替换输入目录）
-java -jar app/build/libs/backup.jar /path/to/world --in-place --progress-mode global
+java -jar java/app/build/libs/backup.jar /path/to/world --in-place --progress-mode global
 
 # 预览模式（只统计不写入）
-java -jar app/build/libs/backup.jar /path/to/world --dry-run --report
+java -jar java/app/build/libs/backup.jar /path/to/world --dry-run --report
 
 # 报告写入文件（JSON）
-java -jar app/build/libs/backup.jar /path/to/world /path/to/out -t 0 \
+java -jar java/app/build/libs/backup.jar /path/to/world /path/to/out -t 0 \
   --report-file /tmp/report.json --report-format json
 ```
 
@@ -107,7 +126,7 @@ java -jar app/build/libs/backup.jar /path/to/world /path/to/out -t 0 \
 
 ```bash
 # BASE=更早全量备份，PATCH=优化备份，OUTPUT=恢复结果
-java -jar app/build/libs/backup.jar merge E:\recover\world E:\recover\world_backup E:\recover\world_recovered \
+java -jar java/app/build/libs/backup.jar merge E:\recover\world E:\recover\world_backup E:\recover\world_recovered \
   --report --progress-mode Global
 ```
 
@@ -288,7 +307,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 | [`docs/paper-26.1-world-migration-report.md`](docs/paper-26.1-world-migration-report.md) | 26.1+ 目录结构迁移分析 |
 | [`docs/world-directory-structure-comparison.md`](docs/world-directory-structure-comparison.md) | 旧版/新版/原生目录结构对比 |
 | [`docs/market-positioning-analysis.md`](docs/market-positioning-analysis.md) | 市场定位、竞品与产品化分析 |
-| [`docs/upstream-comparison.md`](docs/upstream-comparison.md) | 与上游 `aternos/thanos` 的功能对照、差异与已知增强项 |
+| [`spec/upstream-divergences.md`](spec/upstream-divergences.md) | 与上游 `aternos/thanos` 的功能对照、差异与已知增强项 |
 | [`CHANGELOG.md`](CHANGELOG.md) | 版本历史与变更说明 |
 
 > 🚀 产品落地页（GitHub Pages）：[orzmc.github.io/OrzMCBackup](https://orzmc.github.io/OrzMCBackup/)
@@ -297,26 +316,27 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 
 ## 测试与质量
 
-- **CI 矩阵**：JDK 17 / 21 / 25 × Ubuntu / macOS / Windows（[`test-matrix.yml`](.github/workflows/test-matrix.yml)）
+- **CI 矩阵**：Java 域 JDK 17 / 21 / 25 × Ubuntu / macOS / Windows（[`java.yml`](.github/workflows/java.yml)）；
+  Rust 域 fmt / clippy / `cargo check --locked` / test（[`rust.yml`](.github/workflows/rust.yml)）
 - **覆盖率门槛**：core ≥ 75%、app ≥ 50%（Kover，CI 强制，报告上传 CodeCov）
 - **静态分析**：ktlint + detekt（根 [`detekt.yml`](detekt.yml)）
 - **测试策略**：`MemoryFS` + `MemoryMcaIOFactory` 内存端到端 + 真实 MCA 夹具 + merge 真实夹具对
   （`Fixtures/merge/`，可用 `python tools/gen_merge_fixtures.py` 重新生成）
 
 ```bash
-./gradlew :core:test :app:test --no-daemon   # 全部测试
-./gradlew ktlintCheck detekt --no-daemon     # 代码风格与静态分析
+java/gradlew -p java :core:test :app:test --no-daemon   # 全部测试
+java/gradlew -p java ktlintCheck detekt --no-daemon     # 代码风格与静态分析
 ```
 
 ---
 
 ## 构建与发布
 
-- **环境**：Gradle Wrapper `9.7.0`；JDK **17-29**（构建脚本阻止 30+）；产物目标 Java 17
+- **环境**：Gradle Wrapper `9.7.0`（位于 `java/`）；JDK **17-29**（构建脚本阻止 30+）；产物目标 Java 17
 - **版本管理**：根 `build.gradle.kts` + `gradle/libs.versions.toml` 统一注入；`-Pversion=X.Y.Z` 覆盖
-- **本地构建 CLI**：`./gradlew :app:shadowJar --no-daemon`
-- **库发布**：`./gradlew :core:portalBundle -Pversion=X.Y.Z -Psigning.keyId=... -Psigning.password=... -Psigning.key=...`
-  生成 `core/build/portal-bundle.zip`（含 GPG 签名 + sources + javadoc），上传 Maven Central Publisher Portal
+- **本地构建 CLI**：`java/gradlew -p java :app:shadowJar --no-daemon`
+- **库发布**：`java/gradlew -p java :core:portalBundle -Pversion=X.Y.Z -Psigning.keyId=... -Psigning.password=... -Psigning.key=...`
+  生成 `java/core/build/portal-bundle.zip`（含 GPG 签名 + sources + javadoc），上传 Maven Central Publisher Portal
 - **GitHub Actions**：`release-app.yml` 发布 CLI 到 GitHub Release；`release-lib.yml` 发布库到 Maven Central；
   两者使用 **Temurin 21** 构建（lint/coverage 用 JDK 25）
 

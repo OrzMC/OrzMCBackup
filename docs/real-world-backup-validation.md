@@ -4,7 +4,7 @@
 >
 > 验证对象：`E:\test\world`（真实 PaperMC 26.1+ 世界，~14 GB / 29,046 文件 / 21,692 `.mca`）
 >
-> 备份工具：OrzBackup（`app/build/libs/backup.jar`，含缺陷 A/B 修复及两轮代码审查后的最终代码）
+> 备份工具：OrzBackup（`java/app/build/libs/backup.jar`，含缺陷 A/B 修复及两轮代码审查后的最终代码）
 >
 > 分析工作区：`E:\test\_backup_analysis\`（snapshot.ps1 / compare.ps1 / 各 CSV 清单）
 
@@ -137,7 +137,7 @@ java -jar backup.jar E:\test\world E:\test\world_backup --copy-misc --parallelis
 
 校验命令：
 ```bash
-./gradlew :core:test :app:test ktlintCheck detekt --no-daemon
+java/gradlew -p java :core:test :app:test ktlintCheck detekt --no-daemon
 ```
 （全部通过）
 
