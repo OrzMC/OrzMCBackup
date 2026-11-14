@@ -1,6 +1,8 @@
 # OrzMCBackup 功能点梳理
 
-> 基于 v0.3.1 代码库；2026-11 增补：单仓多语言（`spec/`+`java/`+`rust/`）、一致性向量与门禁、`merge --dry-run`、QoI（损坏 region 保留、`InhabitedTime` 结构化扫描）
+> 基于 v0.3.2 代码库；2026-11 增补：单仓多语言（`spec/`+`java/`+`rust/`）、一致性向量与门禁、
+> `merge --dry-run` / `--diff-file`、QoI（损坏 region 保留、`InhabitedTime` 结构化扫描）、
+> Rust 分发（crates.io + Homebrew tap `orzmc/core`）
 
 ## 一、项目定位
 
@@ -226,8 +228,8 @@ patterns = [ListPattern(forced), InhabitedTimePattern(ticks, removeUnknown)] + F
 | `--progress-interval` | 1000 | 进度回调间隔（文件数） |
 | `--report` | false | 打印合并统计与错误 |
 | `--report-file` / `--report-format` | null / json | 报告写文件（json/csv） |
-| `--dry-run` | false | 只预览槽位级合并决策，**不创建/不修改任何东西**（输出目录可以不存在） |
-| `--diff-file` | null | 写 chunk 级差异清单（可直接配合真实合并：先出清单，再合并） |
+| `--dry-run` | false | 只预览槽位级合并决策，**不创建/不修改任何东西**（输出目录可以不存在）；**仅 Java 版**，Rust 尚无此参数 |
+| `--diff-file` | null | 写 chunk 级差异清单（可直接配合真实合并：先出清单，再合并）；**仅 Java 版** |
 | `--diff-format` | csv | 清单格式：`csv` / `json` / `text` |
 | `--diff-include-patch` | false | 清单额外输出取自 patch 的槽位（行数极大） |
 | `--diff-limit` | 0 | 清单行数硬上限（0 = 不限；统计计数仍精确） |
@@ -506,9 +508,12 @@ patterns = [ListPattern(forced), InhabitedTimePattern(ticks, removeUnknown)] + F
 
 | 工作流 | 触发条件 | 内容 |
 |--------|----------|------|
-| `test-matrix.yml` | push→main / PR | JDK `['17','21']` × ubuntu/windows + macOS 单 JDK 测试；concurrency 取消旧 run；`docs/**`、`*.md` 路径过滤；coverage 并入 ubuntu Java 17 job（复用已跑测试，`:core:koverVerify :app:koverVerify`，lint 使用 JDK 25） |
-| `release-lib.yml` | tag `v*` / manual | 签名并发布库到 Maven Central Portal |
-| `release-app.yml` | tag / manual | 构建 Shadow JAR + GitHub Release |
+| `java.yml` | push→main / PR（无路径过滤，避免必需检查永久 pending） | JDK `17 / 21 / 25` × ubuntu/macOS/windows 测试；concurrency 取消旧 run；coverage 用 JDK 25（`:core:koverVerify :app:koverVerify`，门槛 75% / 50%，上传 CodeCov） |
+| `rust.yml` | push→main / PR | `cargo fmt --check` / `clippy -D warnings` / `check --locked` / `test`（ubuntu/macOS/windows） |
+| `conformance.yml` | push→main / PR | `scripts/conformance.sh all`：java + rust + 上游 PHP 按 `spec/vectors` 中立比对；未登记分歧或 XPASS 即失败 |
+| `release-java-lib.yml` | tag `java-v*` / manual | 签名并发布 `backup-core` 到 Maven Central Portal（Temurin 21） |
+| `release-java-app.yml` | tag `java-v*` / manual | 构建 Shadow JAR（`backup.jar`）+ GitHub Release |
+| `release-rust.yml` | tag `rust-v*` / manual | 构建 6 平台二进制 + GitHub Release + `cargo publish` + 渲染 Homebrew 公式提交到 `OrzMC/homebrew-core`；`mode=homebrew` 可只补发公式 |
 | `dependabot.yml` | 每日 | 自动检查依赖更新 |
 
 ---
@@ -517,13 +522,13 @@ patterns = [ListPattern(forced), InhabitedTimePattern(ticks, removeUnknown)] + F
 
 | 模块 | 特性 |
 |------|------|
-| 根项目 | Kotlin 2.4.10、Gradle 9.7.0、JDK 17-29 校验 |
+| 根项目 | Kotlin 2.4.21、Gradle 9.9.1、JDK 17-29 校验 |
 | `core` | 库发布、签名、Dokka（Javadoc JAR）、test-fixtures、kover 门槛 75% |
 | `app` | Shadow JAR（fat JAR）、picocli CLI、kover 门槛 50% |
 
 ### 依赖
 
-- **核心运行时**：Kotlin stdlib、`at.yawk.lz4:lz4-java:1.11.2`
+- **核心运行时**：Kotlin stdlib、`at.yawk.lz4:lz4-java:1.14.0`
 - **并发**：`kotlinx-coroutines-core:1.11.0`
 - **CLI**：`info.picocli:picocli:4.7.7`
 - **测试**：JUnit Jupiter 6.1.3 + Platform Launcher
@@ -534,7 +539,8 @@ patterns = [ListPattern(forced), InhabitedTimePattern(ticks, removeUnknown)] + F
 
 1. **抽象可测试性**：`FileSystem` + `McaIOFactory` 双抽象层，全管道可在内存测试
 2. **惰性 MCA 写入**：仅在有保留区块时创建 writer，避免空文件
-3. **字节级 InhabitedTime 扫描**：不解析完整 NBT，只搜 `TAG_Long` + 名称匹配合成模式，直接读 8 字节值
+3. **结构感知的 InhabitedTime 扫描**：按 NBT 长度跳过 payload 只走根 compound（含 `root.Level`），
+   嵌套同名 tag 一律忽略（WOS-3.4）——纯字节前缀搜索会误读诱饵字段，已被一致性向量固定
 4. **严格 `>` 语义**：`InhabitedTime == threshold` 的区块被移除（保留），`threshold=0` 移除非活跃区块
 5. **错误容错**：非致命错收集在报告中不中断，`strict` 模式升级为退出码 1
 6. **双节流进度**：支持按区块数和按毫秒两种进度汇报频率
