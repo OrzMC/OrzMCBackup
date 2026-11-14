@@ -70,13 +70,22 @@
 | 主题 | 上游做法 | 我们的做法 | 评价 | 处置 |
 |---|---|---|---|---|
 | 错误哲学 | 一个错误即整体中止（`SnapException`），绝不留半成品 | 收集错误继续，`--strict` 才非 0 | **各有道理**：无人值守备份有时需要"尽量产出 + 明示失败"；但对于"不可审计的半成品"，上游更保守 | 保留现状；WOS-9.4 已写明并强制 `--strict` 用于自动化；待上游反馈后重新评估 |
-| 流式解压 | 2 KiB 分块流式读取，天然无 OOM，无上限 | 整块解压 + 64 MiB 上限，超限安全保留 | 上游内存模型更省；我们的上限在极端大 chunk 上会"多保留一份" | 属实现定义（WOS-11），不改 |
+| 流式解压 | 2 KiB 分块流式读取，天然无 OOM | ~~整块解压 + 64 MiB 上限~~ → **已吸收**：`openDataStream()` + 流式 NBT 扫描（Java/Rust），内存受压缩块大小约束 | 采纳（上表第 3 行记入"已吸收"） | ✅ 已实现，见下节 |
 | 读取接口 | `getSerializedData()` 返回生成器，writer 边读边写 | Java/Rust 整块 buffer | 上游对大 region 更友好；我们换取了 2 GiB 守卫的简单性 | 属实现定义；若将来遇大 region 可在 Rust 侧改流式 |
 | tag 缓存 | `Chunk::$chunkTagCache` 避免同一 chunk 重复扫描 | 每个 chunk 只查一次，无差异 | 目前无影响；若增加更多 tag 可借鉴 | 记录备查 |
 | 空文件写入 | `McaWriter` 有 `writeEmptyFile` 开关 | "全空 region 不生成文件"是硬规则 | 上游更灵活；我们更贴合 MC 约定（WOS-6.4） | 保留现状，若用户需要可加开关 |
 | 上游夹具 | 有真实世界 `Fixtures/world`（676 chunks）、`legacy-forceload` | 我们的向量是合成最小世界（确定性、可复算） | 各有利弊：上游真实、我们可复现 | 长期：可把上游夹具纳入我们的向量（需注明来源与许可） |
 
 ---
+
+## 三½、已吸收的上游优点
+
+| 优点 | 吸收方式 | 证据 |
+|---|---|---|
+| **流式解压**（上游 2 KiB 分块读，不整块落内存） | Java `McaEntry.openDataStream()` + `ChunkNbtScanner.scan(InputStream)`；Rust `McaEntry::open_data_stream()` + `patterns::inhabited::scan(&mut Read)`。逐块解压（LZ4 按 block）、按需前读，内存受压缩块大小约束；64 MiB 上限改为"读取量护栏"（超限仍安全保留 + 记错误） | `McaEntryStreamTest`（4 项：四种压缩流式/缓冲一致、流式扫描、非法长度、炸弹）＋ `rust/tests/streaming_scan.rs`（5 项，含真实 676-chunk region 逐槽位流式/缓冲比对）＋ `vectors/malformed-nbt` |
+
+> 顺带修正一处语义边界：**能解压但不是合法 NBT** 的 payload 现在被显式判为 `Malformed` → 安全保留 + 记
+> `Pattern` 错误（以前是"读不到 tag → 当作无 tag 保留"，不报错）。向量 `malformed-nbt` 钉住这一行为。
 
 ## 四、与规范的关系
 

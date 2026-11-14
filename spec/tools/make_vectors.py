@@ -1452,6 +1452,52 @@ def vector_force_symlink(force: bool) -> None:
     print(f"generated {name}")
 
 
+
+# ---------------------------------------------------------------- vector 24
+
+
+def vector_malformed_nbt(force: bool) -> None:
+    """WOS-6.6: a decompressible payload that is not valid chunk NBT is kept, not dropped."""
+    name = "malformed-nbt"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    entries = [
+        {"index": 0, "method": METHOD_ZLIB, "data": zlib_data(b"not-nbt-at-all"), "mtime": 1_650_000_000},
+        {"index": 1, "method": METHOD_ZLIB, "data": data_for(METHOD_ZLIB, 7_000), "mtime": 1_650_000_001},
+    ]
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "malformed-nbt", "command": "backup",
+             "clauses": ["WOS-6.6"], "args": ["--inhabited-time-seconds", "300"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(entries, [0, 1])},
+        {"path": "level.dat", "sha256": mca.sha256(b"level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-6.6（解压成功但内容不是合法 chunk NBT → 安全保留原字节 + 记错误，不得丢弃）", "",
+        "## 输入", "",
+        "- 槽位 0：ZLIB 压缩的 `not-nbt-at-all`（解压没问题，但不是 NBT compound）",
+        "- 槽位 1：正常 ZLIB `InhabitedTime=7000`", "",
+        "## 期望", "",
+        "- 两个槽位都保留（槽位 0 的 payload 逐字节一致）",
+        "- 这同时覆盖「流式读取时结构损坏」的路径（上游 PHP 在同样输入下也会保留）", "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
 # ---------------------------------------------------------------- shared
 
 
@@ -1568,6 +1614,7 @@ def main() -> int:
     vector_decompress_bomb(args.force)
     vector_inhabited_nested(args.force)
     vector_force_symlink(args.force)
+    vector_malformed_nbt(args.force)
     return 0
 
 

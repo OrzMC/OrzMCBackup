@@ -27,6 +27,13 @@
   `InhabitedTime` 结构化取值（[issue #31](https://github.com/aternosorg/thanos/issues/31)）。
   证据链与跟踪状态见 `spec/upstream-proposals.md`。
 
+### 性能 / 健壮性（吸收上游做法）
+- **chunk 读取改为流式**（Java + Rust）：`McaEntry.openDataStream()` / `open_data_stream()` 逐块解压、
+  按需前读，内存受**压缩块大小**约束而非解压后大小；64 MiB 上限退化为"读取量护栏"
+  （超限仍安全保留 + 记错误）。上游 PHP 一直是流式读，本次对齐并补测试。
+- 能解压但**不是合法 NBT** 的 payload 现在显式判为结构损坏 → 安全保留 + 记 `Pattern` 错误
+  （新增向量 `malformed-nbt`，24 个向量）。
+
 ### 修复
 - **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
   `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；

@@ -1,6 +1,8 @@
 package com.jokerhub.orzmc.mca
 
 import net.jpountz.xxhash.XXHashFactory
+import java.io.ByteArrayInputStream
+import java.io.InputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.util.zip.GZIPInputStream
@@ -165,12 +167,152 @@ class McaEntry(
         return out.toByteArray()
     }
 
+    /**
+     * Streaming view of the **decompressed** chunk payload (WOS-10.2).
+     *
+     * Upstream (PHP) reads chunks as a stream and never materialises the whole payload; this is the
+     * same idea: the caller pulls only as far as it needs (the optimizer stops at the root compound,
+     * usually a few KiB in) while memory stays bounded by the compressed block size, not by the
+     * decompressed size. Exceeding [MAX_UNCOMPRESSED_CHUNK_LENGTH] throws, so callers keep the
+     * existing "safe keep + Pattern error" behaviour.
+     *
+     * Compressed payloads above [MAX_VALID_CHUNK_LENGTH] are treated as corrupt (see [dataBytes]).
+     */
+    fun openDataStream(): InputStream {
+        val (len, method, custom) = readHeader()
+        val customLen = if (method == CompressionMethod.CUSTOM) 2 + (custom?.length ?: 0) else 0
+        val dataLen = len - 1 - customLen
+        if (len < 0 || dataLen <= 0 || len > MAX_VALID_CHUNK_LENGTH) {
+            throw IllegalArgumentException("chunk length field is invalid: $len")
+        }
+        val (dataMethod, compressed, _) = dataBytes()
+        if (compressed.isEmpty()) return ByteArrayInputStream(ByteArray(0))
+        val raw =
+            when (dataMethod) {
+                CompressionMethod.RAW -> ByteArrayInputStream(compressed)
+                CompressionMethod.ZLIB -> InflaterInputStream(ByteArrayInputStream(compressed))
+                CompressionMethod.GZIP -> GZIPInputStream(ByteArrayInputStream(compressed))
+                CompressionMethod.LZ4 -> Lz4BlockInputStream(compressed)
+                CompressionMethod.UNKNOWN -> throw IllegalArgumentException("unknown compression: $dataMethod")
+                else -> ByteArrayInputStream(ByteArray(0))
+            }
+        return BoundedUncompressedInputStream(raw, MAX_UNCOMPRESSED_CHUNK_LENGTH.toLong())
+    }
+
     fun isExternal(): Boolean {
         val (_, method, _) = readHeader()
         return method == CompressionMethod.EXT_GZIP ||
             method == CompressionMethod.EXT_ZLIB ||
             method == CompressionMethod.EXT_RAW ||
             method == CompressionMethod.EXT_LZ4
+    }
+
+    /**
+     * Pulls LZ4 chunk blocks one at a time: each block header declares its compressed and
+     * decompressed size, so a block is the largest allocation we ever make (instead of the whole
+     * chunk). Mirrors `decodeLZ4Blocks`, but lazily.
+     */
+    private class Lz4BlockInputStream(
+        private val input: ByteArray,
+    ) : InputStream() {
+        private var pos = 0
+        private var block: ByteArray = ByteArray(0)
+        private var blockPos = 0
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            return if (read(one, 0, 1) == 1) one[0].toInt() and 0xFF else -1
+        }
+
+        override fun read(
+            buf: ByteArray,
+            off: Int,
+            len: Int,
+        ): Int {
+            if (len == 0) return 0
+            while (blockPos >= block.size) {
+                if (!nextBlock()) return -1
+            }
+            val n = minOf(len, block.size - blockPos)
+            System.arraycopy(block, blockPos, buf, off, n)
+            blockPos += n
+            return n
+        }
+
+        private fun nextBlock(): Boolean {
+            if (pos + LZ4_HEADER_LEN > input.size) return false
+            if (!input.copyOfRange(pos, pos + 8).contentEquals(LZ4_MAGIC)) {
+                throw IllegalArgumentException("invalid LZ4 magic")
+            }
+            val method = input[pos + 8].toInt() and 0xF0
+            val compLen = ByteBuffer.wrap(input, pos + 9, 4).order(ByteOrder.LITTLE_ENDIAN).int
+            val decompLen = ByteBuffer.wrap(input, pos + 13, 4).order(ByteOrder.LITTLE_ENDIAN).int
+            val checksumLe = ByteBuffer.wrap(input, pos + 17, 4).order(ByteOrder.LITTLE_ENDIAN).int
+            val start = pos + LZ4_HEADER_LEN
+            if (compLen < 0 || start + compLen > input.size) throw IllegalArgumentException("LZ4 block truncated")
+            if (decompLen < 0 || decompLen > MAX_UNCOMPRESSED_CHUNK_LENGTH) {
+                throw IllegalArgumentException("LZ4 block declares oversized decompressed length: $decompLen")
+            }
+            val decoded =
+                when (method) {
+                    0x10 -> input.copyOfRange(start, start + compLen)
+                    0x20 -> {
+                        val dest = ByteArray(decompLen)
+                        net.jpountz.lz4.LZ4Factory.safeInstance().safeDecompressor().decompress(
+                            input,
+                            start,
+                            compLen,
+                            dest,
+                            0,
+                        )
+                        dest
+                    }
+
+                    else -> throw IllegalArgumentException("unsupported LZ4 method")
+                }
+            if ((xxh32(decoded, LZ4_XXHASH_SEED) and 0x0FFFFFFF) != checksumLe) {
+                throw IllegalArgumentException("LZ4 checksum mismatch")
+            }
+            pos = start + compLen
+            block = decoded
+            blockPos = 0
+            return true
+        }
+    }
+
+    /** Fails once [limit] bytes of (decompressed) data have been produced. */
+    private class BoundedUncompressedInputStream(
+        private val delegate: InputStream,
+        private val limit: Long,
+    ) : InputStream() {
+        private var total = 0L
+
+        private fun account(n: Int) {
+            total += n
+            if (total > limit) {
+                throw IllegalArgumentException("chunk decompressed data exceeds $limit bytes")
+            }
+        }
+
+        override fun read(): Int {
+            val v = delegate.read()
+            if (v >= 0) account(1)
+            return v
+        }
+
+        override fun read(
+            buf: ByteArray,
+            off: Int,
+            len: Int,
+        ): Int {
+            val n = delegate.read(buf, off, len)
+            if (n > 0) account(n)
+            return n
+        }
+
+        override fun close() {
+            delegate.close()
+        }
     }
 
     companion object {

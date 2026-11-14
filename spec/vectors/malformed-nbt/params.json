@@ -1,0 +1,12 @@
+{
+  "vector": "malformed-nbt",
+  "title": "malformed-nbt",
+  "command": "backup",
+  "clauses": [
+    "WOS-6.6"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

@@ -32,68 +32,87 @@ const INHABITED_TIME: &str = "InhabitedTime";
 /// Returns `None` when the tag is absent *or* the NBT cannot be parsed; callers then apply the
 /// safe-keep rule (WOS-3.3).
 pub fn find_inhabited_time(data: &[u8]) -> Option<i64> {
-    let mut reader = NbtReader { data, pos: 0 };
-    reader.read_root_inhabited().ok().flatten()
+    match scan(&mut std::io::Cursor::new(data)) {
+        ScanResult::Found(v) => Some(v),
+        _ => None,
+    }
+}
+
+/// Result of a structural scan (mirrors the Kotlin `ChunkNbtScanner.ScanResult`).
+pub enum ScanResult {
+    /// No `InhabitedTime` at the accepted positions (WOS-3.3 applies).
+    Absent,
+    Found(i64),
+    /// The payload is not valid chunk NBT; callers keep it and report an error (WOS-6.6).
+    Malformed(String),
+}
+
+/// Streaming scan (WOS-10.2): reads only as far as the tag, so memory stays bounded.
+pub fn scan(input: &mut dyn std::io::Read) -> ScanResult {
+    let mut reader = NbtReader { input, pos: 0 };
+    match reader.read_root_inhabited() {
+        Ok(Some(v)) => ScanResult::Found(v),
+        Ok(None) => ScanResult::Absent,
+        Err(e) => ScanResult::Malformed(e.to_string()),
+    }
 }
 
 struct NbtReader<'a> {
-    data: &'a [u8],
-    pos: usize,
+    input: &'a mut dyn std::io::Read,
+    pos: u64,
 }
 
 impl<'a> NbtReader<'a> {
-    fn available(&self, n: usize) -> Result<()> {
-        if self.pos + n > self.data.len() {
-            return Err(anyhow!("truncated NBT"));
-        }
-        Ok(())
+    fn bytes(&mut self, n: usize) -> Result<Vec<u8>> {
+        let mut buf = vec![0u8; n];
+        self.input.read_exact(&mut buf)?;
+        self.pos += n as u64;
+        Ok(buf)
     }
 
     fn u8(&mut self) -> Result<u8> {
-        self.available(1)?;
-        let v = self.data[self.pos];
+        let mut b = [0u8; 1];
+        self.input.read_exact(&mut b)?;
         self.pos += 1;
-        Ok(v)
+        Ok(b[0])
     }
 
     fn u16(&mut self) -> Result<u16> {
-        self.available(2)?;
-        let v = BigEndian::read_u16(&self.data[self.pos..self.pos + 2]);
-        self.pos += 2;
-        Ok(v)
+        let b = self.bytes(2)?;
+        Ok(BigEndian::read_u16(&b))
     }
 
     fn i32(&mut self) -> Result<i32> {
-        self.available(4)?;
-        let v = BigEndian::read_i32(&self.data[self.pos..self.pos + 4]);
-        self.pos += 4;
-        Ok(v)
+        let b = self.bytes(4)?;
+        Ok(BigEndian::read_i32(&b))
     }
 
     fn i64(&mut self) -> Result<i64> {
-        self.available(8)?;
-        let v = BigEndian::read_i64(&self.data[self.pos..self.pos + 8]);
-        self.pos += 8;
-        Ok(v)
+        let b = self.bytes(8)?;
+        Ok(BigEndian::read_i64(&b))
     }
 
-    fn skip(&mut self, n: usize) -> Result<()> {
-        self.available(n)?;
-        self.pos += n;
+    fn skip(&mut self, n: u64) -> Result<()> {
+        let mut remaining = n;
+        let mut scratch = [0u8; 8192];
+        while remaining > 0 {
+            let want = remaining.min(scratch.len() as u64) as usize;
+            self.input.read_exact(&mut scratch[..want])?;
+            remaining -= want as u64;
+            self.pos += want as u64;
+        }
         Ok(())
     }
 
     fn read_string(&mut self) -> Result<String> {
         let len = self.u16()? as usize;
-        self.available(len)?;
-        let s = String::from_utf8_lossy(&self.data[self.pos..self.pos + len]).to_string();
-        self.pos += len;
-        Ok(s)
+        let b = self.bytes(len)?;
+        Ok(String::from_utf8_lossy(&b).to_string())
     }
 
     fn read_root_inhabited(&mut self) -> Result<Option<i64>> {
         if self.u8()? != TAG_COMPOUND {
-            return Err(anyhow!("chunk payload is not a compound"));
+            return Err(anyhow!("chunk payload is not an NBT compound"));
         }
         let _root_name = self.read_string()?;
         self.read_compound_body(0, None)
@@ -154,7 +173,7 @@ impl<'a> NbtReader<'a> {
             9 => {
                 let elem = self.u8()?;
                 let count = self.i32()?;
-                if count < 0 || count as usize > self.data.len() {
+                if !(0..=10_000_000).contains(&count) {
                     return Err(anyhow!("invalid list length {}", count));
                 }
                 for _ in 0..count {
@@ -182,12 +201,12 @@ impl<'a> NbtReader<'a> {
         }
     }
 
-    fn array_len(&mut self) -> Result<usize> {
+    fn array_len(&mut self) -> Result<u64> {
         let len = self.i32()?;
-        if len < 0 || len as usize > self.data.len() {
+        if len < 0 {
             return Err(anyhow!("invalid array length {}", len));
         }
-        Ok(len as usize)
+        Ok(len as u64)
     }
 }
 
@@ -196,16 +215,17 @@ impl ChunkPattern for InhabitedTimePattern {
         if entry.is_external()? {
             return Ok(!self.remove_unknown);
         }
-        let de = entry.all_data_uncompressed()?;
-        if de.is_empty() {
-            return Ok(!self.remove_unknown);
-        }
-        if let Some(t) = find_inhabited_time(&de) {
+        // Streams the decompressed payload (WOS-10.2): memory stays bounded by one compressed
+        // block instead of the whole decompressed chunk, and we stop at the root tag.
+        let mut stream = entry.open_data_stream()?;
+        match scan(&mut *stream) {
             // Strictly greater: a chunk whose InhabitedTime equals the threshold is removed.
             // Matches Aternos/Thanos (InhabitedTimePattern.php) and OrzMCBackup semantics.
-            return Ok(t > self.threshold);
+            ScanResult::Found(t) => Ok(t > self.threshold),
+            ScanResult::Absent => Ok(!self.remove_unknown),
+            // Unparseable chunk: keep it (WOS-6.6); the error makes the engine record a Pattern error.
+            ScanResult::Malformed(reason) => Err(anyhow!("malformed chunk NBT: {}", reason)),
         }
-        Ok(!self.remove_unknown)
     }
 
     fn box_clone(&self) -> Box<dyn ChunkPattern> {

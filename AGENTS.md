@@ -131,18 +131,20 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 3. **进度报告**：两种限流——按区块数（`progressInterval`）或按时间（`progressIntervalMs`，优先）。
 4. **可扩展性**：`parallelism` 驱动 region 层并行（每个任务一个 `.mca`）；维度按序处理，避免并行度平方
    （A5 后不再有维度级并行）。
-5. **InhabitedTime 结构感知扫描**：只走 chunk 根 compound（按长度跳过 payload，不做完整反序列化），
+5. **chunk 读取是流式的**：`McaEntry.openDataStream()`（Java）/ `open_data_stream()`（Rust）逐块解压按需前读，
+   内存受压缩块大小约束；`InhabitedTime` 扫描在这条流上做，不落整块解压数据。
+6. **InhabitedTime 结构感知扫描**：只走 chunk 根 compound（按长度跳过 payload，不做完整反序列化），
    只接受根层或 `root.Level` 的 tag（WOS-3.4），嵌套同名 tag 一律忽略。
-6. **惰性 MCA 写入**：仅当至少保留一个区块才创建输出 writer，避免空 MCA 文件。
-7. **26.1+ 兼容**：ForceLoad 探测 `chunk_tickets.dat` → `chunks.dat`；维度发现递归支持 `dimensions/` 嵌套；
+7. **惰性 MCA 写入**：仅当至少保留一个区块才创建输出 writer，避免空 MCA 文件。
+8. **26.1+ 兼容**：ForceLoad 探测 `chunk_tickets.dat` → `chunks.dat`；维度发现递归支持 `dimensions/` 嵌套；
    `discoverMiscParents` 自动发现 world 级杂项源，确保 `level.dat`/`players/`/`data/` 等在直接传入世界目录时也正确复制。
-8. **merge 数据安全**：patch 优先、base 填空、entities/poi 锁步；三目录互斥校验（alias guard，`OverlapGuard`）；损坏 patch 回退 base。
-9. **输入/输出重叠守卫（`OverlapGuard`）**：`Optimizer.run` 与 `WorldMerger.run` 共用的重叠校验单一事实源，
+9. **merge 数据安全**：patch 优先、base 填空、entities/poi 锁步；三目录互斥校验（alias guard，`OverlapGuard`）；损坏 patch 回退 base。
+10. **输入/输出重叠守卫（`OverlapGuard`）**：`Optimizer.run` 与 `WorldMerger.run` 共用的重叠校验单一事实源，
    在 `--force` 覆盖前拒绝 input==output/嵌套/祖先/符号链接别名，防止不可逆清空源世界；RealFileSystem 走
    `toRealPath`（解析别名），MemoryFS 走词法 normalize。
-10. **跨域一致性**：`spec/` 是行为真值；`java/`、`rust/` 的可观察行为必须能通过 `spec/vectors` 的一致性
+11. **跨域一致性**：`spec/` 是行为真值；`java/`、`rust/` 的可观察行为必须能通过 `spec/vectors` 的一致性
     检查（`scripts/conformance.sh`），允许的分歧只登记在 `spec/divergences.md`。
-11. **解压炸弹防护**：`McaEntry.allDataUncompressed` 对解压总量设 64MB 硬上限（ZLIB/GZIP 有界读取；
+12. **解压炸弹防护**：`McaEntry.allDataUncompressed` 对解压总量设 64MB 硬上限（ZLIB/GZIP 有界读取；
     LZ4 分配前校验声明长度 + 累计校验），超限走安全保留路径（原字节透传 + Pattern 错误），绝不丢弃。
 
 ## 编码规范与质量门槛
