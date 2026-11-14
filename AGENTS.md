@@ -78,7 +78,8 @@ java/gradlew -p java :core:printTestPaths --no-daemon
 跨域一致性（**CI 阻断门禁**，改动 spec/java/rust 都要跑）：
 
 ```bash
-./scripts/conformance.sh all      # 构建 java+rust，跑 spec/vectors 全部向量并做中立比对
+./scripts/conformance.sh all      # 构建 java+rust（+ 本地有 php 时跑上游），全部向量中立比对
+./scripts/conformance.sh upstream # 只跑上游 PHP 参考实现（xfail 登记在 spec/upstream-expectations.json）
 ./scripts/conformance.sh --no-build java   # 用已有产物只跑某域
 python3 spec/tools/make_vectors.py --force # 重新生成向量（CI 会校验 git diff 为空）
 ```

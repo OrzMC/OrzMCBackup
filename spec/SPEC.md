@@ -161,6 +161,12 @@
 - **WOS-12.3** 向量以仓库内 `spec/vectors/<name>/{params.json,input/,expected/manifest.json}` 组织，
   `MUST` 可通过 `scripts/conformance.sh` 复现。
 - **WOS-12.4** conformance 失败 `MUST` 阻断合并（CI 门禁）。
+- **WOS-12.5** **上游 PHP 实现也在门禁内**：`scripts/conformance.sh upstream` 通过
+  `spec/tools/upstream_adapter.php` 驱动 `upstream/thanos` 跑同一批向量。
+  上游**无法运行**的向量（缺少该特性）登记在 `spec/upstream-expectations.json` 的 `not_applicable`；
+  已知**行为不同**的向量登记在 `expected_failures`（每项 `MUST` 在 `upstream-divergences.md` 有对应行）。
+  **未登记的不一致即失败**——此时只有两种正确处置：要么修上游/本实现，要么更新规范并登记；
+  已登记但实际通过的向量报 `XPASS` 并失败（防止登记表变成垃圾桶）。
 
 ---
 

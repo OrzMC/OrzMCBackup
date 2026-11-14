@@ -8,6 +8,9 @@
   Rust 实现一直如此，本次对齐 Java 实现。
 
 ### 新增
+- **上游 PHP 进入一致性门禁**（WOS-12.5）：`scripts/conformance.sh upstream` + `spec/tools/upstream_adapter.php`
+  用同一批 23 个向量驱动 `upstream/thanos`；已知分歧登记在 `spec/upstream-expectations.json`，
+  **未登记的不一致直接失败**（`XPASS` 也会失败），CI 装 PHP 8.4 后强制执行。
 - `merge --dry-run` + `--diff-file`：只预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
 - `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
 - **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、

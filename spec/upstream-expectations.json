@@ -1,0 +1,22 @@
+{
+  "note": "Upstream PHP (aternosorg/thanos) is a *reference* implementation. Vectors it cannot run (feature absent) are 'not_applicable'; vectors where it demonstrably behaves differently are 'expected_failures' and must have a row in spec/upstream-divergences.md. Anything else that differs is a real signal: either the spec needs to be aligned with upstream, or upstream is wrong — decide and record it, do not silence it here.",
+  "not_applicable": [
+    { "vector": "merge-basic", "reason": "upstream has no merge command (WOS-8 is project-specific)" },
+    { "vector": "merge-parallel", "reason": "upstream has no merge command" },
+    { "vector": "merge-corrupt-patch", "reason": "upstream has no merge command" },
+    { "vector": "merge-overlap", "reason": "upstream has no merge command" },
+    { "vector": "cli-dry-run", "reason": "upstream has no --dry-run" },
+    { "vector": "force-output-symlink", "reason": "upstream has no --force / cleans no output directory" },
+    { "vector": "overlap-rejected", "reason": "upstream has no overlapping-directory guard (WOS-10.1)" },
+    { "vector": "report-fields", "reason": "upstream emits no machine-readable report (WOS-9)" }
+  ],
+  "expected_failures": [
+    { "vector": "forceload-forced", "clause": "WOS-4.3", "reason": "upstream reads the packed long high-32 as x (axis swap) — see upstream-divergences.md" },
+    { "vector": "inhabited-nested", "clause": "WOS-3.4", "reason": "upstream does a raw byte-prefix scan and picks the nested decoy tag" },
+    { "vector": "world-basic", "clause": "WOS-7.4", "reason": "upstream copies session.lock to the output" },
+    { "vector": "errors-corrupt-region", "clause": "WOS-6.7", "reason": "upstream aborts the whole run on a corrupt region instead of preserving it" },
+    { "vector": "corrupt-chunk", "clause": "WOS-6.6", "reason": "upstream throws on an unreadable chunk and aborts" },
+    { "vector": "custom-compression", "clause": "WOS-2.6", "reason": "upstream throws UnsupportedFeatureException for CUSTOM compression" },
+    { "vector": "compression-matrix", "clause": "WOS-2.4", "reason": "upstream needs the PHP lz4 extension; the harness installs only zlib" }
+  ]
+}
