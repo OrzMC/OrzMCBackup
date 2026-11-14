@@ -1,6 +1,41 @@
 # Changelog
 
-## Unreleased
+## rust-v0.0.4 (2026-11-14)
+
+首个从单仓（`OrzMC/OrzMCBackup` 的 `rust/`）发布的版本，同时**首次发布到 crates.io**。
+
+### 升级须知（需要你动手）
+
+- 新增安装方式：`cargo install rust-thanos`；作为库使用：`rust-thanos = "0.0.4"`。
+- 预编译二进制与 Homebrew 名称不变，但**发布页迁移**到 <https://github.com/OrzMC/OrzMCBackup/releases>
+  （旧仓 `OrzMC/rust-thanos` 已归档），资产名统一为 `rust-thanos-<version>-<target>.tar.gz|.zip`。
+- ⚠️ **行为变更**：`rust-thanos backup /world /world`（输出与输入相同）现在**直接报错退出**，
+  不再交互询问"是否覆盖"。旧版若答 `y` 会先 `remove_dir_all(输出)`，然后才跑到重叠守卫 ——
+  等于**删掉源世界**。脚本里依赖旧行为的请改用临时目录或 `--in-place`。
+
+### 数据安全
+
+- **无法解析的 region 原样保留**到输出（含同名 `entities`/`poi` 兄弟文件），并记录错误；
+  旧版会静默丢弃该 region（备份缺一块）。
+- 能解压但**不是合法 NBT** 的 chunk：保留原字节并记 `Pattern` 错误（旧版当作"无 tag"保留但不报错）。
+- legacy `data.Forced`（Forge/旧版世界的强制加载列表）：**一个 long 一个 chunk**
+  （x 低 32 位 / z 高 32 位）。旧版把两个 long 拼成一个坐标，导致坐标错位、奇数项丢失
+  → 真正被 `/forceload` 的区块可能被删。
+- `InhabitedTime` 改为**结构感知**读取：只接受 chunk 根层（1.18+）或 `root.Level`（≤1.17）的 tag；
+  `structures`/模组数据里的同名 tag 不再影响保留判定（旧版取第一个字节前缀命中）。
+- `--zip-output`：归档写在输出目录**旁边**、条目统一用 `/` 分隔符；zip 依赖升级到 9.x。
+
+### 性能
+
+- chunk 读取改为**流式**（逐块解压、按需前读）：内存受压缩块大小约束，而不是解压后大小；
+  64 MiB 上限降级为"读取量护栏"（超限仍安全保留 + 记错误）。
+
+### 其他
+
+- `walkdir` / `fs_extra` 归入 `dev-dependencies`（此前在 `[dependencies]` 里未使用）。
+- CI 增加跨实现一致性门禁（与 Kotlin 实现共用 `spec/vectors` 的 24 个向量）。
+
+## Unreleased（Java）
 
 ### 行为变更（用户可见）
 - **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其 `entities`/`poi`

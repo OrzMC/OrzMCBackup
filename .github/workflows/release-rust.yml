@@ -95,6 +95,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Determine product name
+        if: steps.guard.outputs.skip != 'true'
         id: product
         shell: bash
         run: |
@@ -204,19 +205,23 @@ jobs:
             echo "sha_linux_arm64=$(sha256sum "$name-$tag-aarch64-unknown-linux-gnu.tar.gz" | cut -d ' ' -f1)"
           } >> "$GITHUB_OUTPUT"
 
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            安装：`cargo install rust-thanos` / `brew install rust-thanos` / 下方预编译资产。
+            完整变更与升级须知见仓库 CHANGELOG 的 `rust-v$(ver)` 一节。
+
       - name: Publish crate to crates.io
-        # Distribution for Rust: `cargo install rust-thanos` (CLI) and
-        # `rust-thanos = "x.y.z"` (library). Skipped until the CARGO_REGISTRY_TOKEN secret exists.
+        # Runs after the GitHub Release so a registry hiccup cannot hide the artifacts.
+        # Skipped automatically when the (org) secret is not exposed to this repository.
         if: env.CARGO_REGISTRY_TOKEN != ''
         working-directory: rust
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
         run: cargo publish --locked
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v3
-        with:
-          files: dist/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -224,11 +229,25 @@ jobs:
     needs: publish-release
     runs-on: ubuntu-latest
     steps:
+      - name: Check tap credentials
+        id: guard
+        env:
+          TAP_REPO: ${{ secrets.HOMEBREW_TAP_REPO }}
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}
+        run: |
+          if [ -z "$TAP_REPO" ] || [ -z "$TAP_TOKEN" ]; then
+            echo "::notice::Homebrew tap secrets (HOMEBREW_TAP_REPO / HOMEBREW_TAP_REPO_TOKEN) are not exposed to this repository; skipping the formula update."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
       - name: Checkout main repo
+        if: steps.guard.outputs.skip != 'true' 
         uses: actions/checkout@v7
         with:
           path: main
       - name: Set up Rust toolchain (for formula bins)
+        if: steps.guard.outputs.skip != 'true'
         uses: actions-rust-lang/setup-rust-toolchain@v2
         with:
           toolchain: stable
@@ -242,12 +261,14 @@ jobs:
           echo "product_name=$name" >> "$GITHUB_OUTPUT"
           echo "product_desc=${desc:-$name}" >> "$GITHUB_OUTPUT"
       - name: Build formula metadata
+        if: steps.guard.outputs.skip != 'true'
         id: formula
         run: |
           pname="${{ steps.product_main.outputs.product_name }}"
           class=$(echo "$pname" | awk -F'[-_]' '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) tolower(substr($i,2))}}')
           echo "formula_class=$class" >> "$GITHUB_OUTPUT"
       - name: Determine binary list (formula)
+        if: steps.guard.outputs.skip != 'true'
         id: bins
         run: |
           cd main/rust
@@ -260,6 +281,7 @@ jobs:
           if [ -z "$bins" ]; then echo "No executable artifacts found for formula generation. Ensure binaries build on Linux for Homebrew test." >&2; exit 1; fi
           echo "bins=$bins" >> "$GITHUB_OUTPUT"
       - name: Prepare URLs
+        if: steps.guard.outputs.skip != 'true'
         id: prep
         run: |
           {
@@ -273,6 +295,7 @@ jobs:
             echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-unknown-linux-gnu.tar.gz"
           } >> "$GITHUB_OUTPUT"
       - name: Verify Tap Repo variable
+        if: steps.guard.outputs.skip != 'true'
         id: tap
         run: |
           if [ -z "${{ secrets.HOMEBREW_TAP_REPO }}" ]; then
@@ -281,18 +304,21 @@ jobs:
           fi
           echo "repo=${{ secrets.HOMEBREW_TAP_REPO }}" >> "$GITHUB_OUTPUT"
       - name: Verify Tap Repo token
+        if: steps.guard.outputs.skip != 'true'
         run: |
           if [ -z "${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}" ]; then
             echo "HOMEBREW_TAP_REPO_TOKEN secret is not set. Please add it in Repository Settings → Secrets and variables → Actions." >&2
             exit 1
           fi
       - name: Checkout tap repo
+        if: steps.guard.outputs.skip != 'true'
         uses: actions/checkout@v7
         with:
           repository: ${{ steps.tap.outputs.repo }}
           token: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}
           path: tap
       - name: Render formula
+        if: steps.guard.outputs.skip != 'true'
         run: |
           tpl="main/.github/homebrew_formula.rb.tpl"
           out="tap/Formula/${{ steps.product_main.outputs.product_name }}.rb"
@@ -312,6 +338,7 @@ jobs:
             -e "s/SHA_LINUX_X64/${{ needs.publish-release.outputs.sha_linux_x64 }}/" \
             -e "s/SHA_LINUX_ARM64/${{ needs.publish-release.outputs.sha_linux_arm64 }}/" "$out"
       - name: Commit & push
+        if: steps.guard.outputs.skip != 'true'
         run: |
           cd tap/Formula
           git config user.name "github-actions"
