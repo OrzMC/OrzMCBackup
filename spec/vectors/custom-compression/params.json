@@ -1,0 +1,12 @@
+{
+  "vector": "custom-compression",
+  "title": "custom-compression",
+  "command": "backup",
+  "clauses": [
+    "WOS-2.6"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

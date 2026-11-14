@@ -21,6 +21,8 @@
 | `tools/manifest.py` | 从输出目录派生实际清单（实现不产 manifest） |
 | `tools/compare.py` | 中立比较器（严格集合/payload/时间戳；忽略扇区布局等实现定义项） |
 | `tools/make_vectors.py` | 按条款生成向量的输入与**期望**清单（确定性，无时钟） |
+| `tools/check_report.py` | 比较报告 JSON 的**规范字段**（忽略实现定义的附加字段） |
+| `tools/coverage.py` | 条款 ↔ 向量覆盖矩阵（`--strict` 可作 CI 门禁） |
 
 ## 使用
 

@@ -12,7 +12,10 @@
 - `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
 - **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、
   `upstream/thanos`（官方 PHP，嵌套只读子模块）。命令改为 `java/gradlew -p java <task>`。
-- `scripts/conformance.sh` + `spec/vectors`（7 个向量）：跨实现一致性门禁（CI 阻断）。
+- `scripts/conformance.sh` + `spec/vectors`（**21 个向量**）：跨实现一致性门禁（CI 阻断）；
+  条款覆盖 46/53（`spec/tools/coverage.py`）。向量覆盖：压缩矩阵、外部 `.mcc`、`CUSTOM` 压缩、
+  损坏 chunk/region、解压炸弹、符号链接世界、26.1 嵌套维度、merge 全流程与并行确定性、
+  重叠拒绝、报告字段语义、`--dry-run` 零写入。
 
 ### 修复
 - legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。

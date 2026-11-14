@@ -46,12 +46,9 @@ run_one() {
   work="$(mktemp -d "${TMPDIR:-/tmp}/conformance-${impl}-${name}-XXXX")"
   out="$work/out"
   log="$work/run.log"
-  # run against a private copy so a vector may legitimately stress destructive paths
-  # (overlap guards) without endangering the committed fixtures
-  cp -a "$vec/input" "$work/input"
-
-  local command expect_no_output dry_run expect_exit output_override
+  local command expect_no_output dry_run expect_exit output_override world_field world_path report_args=""
   command="$(vec_field "$vec/params.json" command)"
+  world_field="$(vec_field "$vec/params.json" world)"
   expect_exit="$(vec_field "$vec/params.json" expect_exit)"
   output_override="$(vec_field "$vec/params.json" output)"
   [[ -z "$expect_exit" ]] && expect_exit=0
@@ -65,6 +62,22 @@ run_one() {
   [[ "$expect_no_output" == "1" ]] && expect_no_output=true || expect_no_output=false
   [[ "$dry_run" == "1" ]] && dry_run=true || dry_run=false
 
+  # run against a private copy so a vector may legitimately stress destructive paths
+  # (overlap guards) without endangering the committed fixtures
+  cp -a "$vec/input" "$work/input"
+  world_path="$work/input"
+  case "$world_field" in
+    "") ;;
+    symlink)
+      # WOS-7.5: the world root itself is a symlink to the real directory
+      ln -s "$work/input" "$work/world-link"
+      world_path="$work/world-link" ;;
+    *) world_path="$work/input/$world_field" ;;
+  esac
+  if python3 -c 'import json,sys; sys.exit(0 if "report" in json.load(open(sys.argv[1])) else 1)' "$vec/params.json"; then
+    report_args="--report-file $work/report.json --report-format json"
+  fi
+
   # input must be read-only for every vector: snapshot it before the run
   python3 "$ROOT/spec/tools/manifest.py" "$work/input" --out "$work/input-before.json" >/dev/null || return 1
 
@@ -73,9 +86,9 @@ run_one() {
   [[ "$dry_run" == true ]] && dry_args="--dry-run"
 
   case "$impl:$command" in
-    java:backup) ( cd "$work" && java -jar "$JAR" "$work/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
-    rust:backup) ( cd "$work" && "$RUST_BIN" backup "$work/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
-    java:merge) ( cd "$work" && java -jar "$JAR" merge "$work/input/base" "$work/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    java:backup) ( cd "$work" && java -jar "$JAR" "$world_path" "$out" $dry_args $report_args $args ) >"$log" 2>&1 ;;
+    rust:backup) ( cd "$work" && "$RUST_BIN" backup "$world_path" "$out" $dry_args $report_args $args ) >"$log" 2>&1 ;;
+    java:merge) ( cd "$work" && java -jar "$JAR" merge "$work/input/base" "$work/input/patch" "$out" $dry_args $report_args $args ) >"$log" 2>&1 ;;
     rust:merge) ( cd "$work" && "$RUST_BIN" merge "$work/input/base" "$work/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
     *) echo "::error::unknown impl/command: $impl/$command"; return 1 ;;
   esac
@@ -126,6 +139,13 @@ run_one() {
   fi
 
   python3 "$ROOT/spec/tools/manifest.py" "$out" --vector "$name" --out "$work/actual.json" >/dev/null || return 1
+  if [[ -n "$report_args" ]]; then
+    python3 -c 'import json,sys; d=json.load(open(sys.argv[1]))["report"]; json.dump(d, open(sys.argv[2],"w"))'       "$vec/params.json" "$work/expected-report.json"
+    if ! python3 "$ROOT/spec/tools/check_report.py" "$work/expected-report.json" "$work/report.json"; then
+      echo "[FAIL] $impl/$name: report fields differ"
+      return 1
+    fi
+  fi
   if python3 "$ROOT/spec/tools/compare.py" "$vec/expected/manifest.json" "$work/actual.json"; then
     echo "[PASS] $impl/$name"
     [[ $KEEP -eq 1 ]] || rm -rf "$work"

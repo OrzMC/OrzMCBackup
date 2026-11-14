@@ -33,7 +33,9 @@
 - **WOS-2.3** 每个 chunk payload `MUST` 为 `4 B 长度 + 1 B 压缩方法 + 数据`，从 4 KiB 扇区边界开始。
 - **WOS-2.4** 压缩方法码表：`1=GZIP`、`2=ZLIB`、`3=RAW`、`4=LZ4`、`127=CUSTOM`（后跟 2 B 名称长度 + 名称）、
   `-127..-124 = 外部存储（EXT_*）`，其数据在 `.mcc` 文件中。
-- **WOS-2.5** 读取外部存储区块时 `MUST` 不做内联解压；保留与否由 WOS-5.3 决定，但**字节必须原样保留**。
+- **WOS-2.5** 读取外部存储区块时 `MUST` 不做内联解压；保留与否由 WOS-5.3 决定，但**字节必须原样保留**，
+  且其外部数据文件（`region/*.mcc`）`MUST` 随输出一起复制（属杂项，见 WOS-7.3）。
+  `conformance: mcc-external`
 - **WOS-2.6** `CUSTOM` 压缩 `MUST` 走安全保留（无法解压 ≠ 可删除）。
   `impl:` java `mca/McaEntry.kt` / rust `mca/entry.rs` / upstream `Mca/Entry/McaEntry.php`（`divergent`：上游抛不支持）
 
@@ -78,8 +80,8 @@
 - **WOS-6.4** 若某 region 的所有槽位均被删除，`MUST NOT` 生成空 `.mca` 文件（惰性写入）。
 - **WOS-6.5** entities / poi `MUST` 与 region **同槽位锁步**：保留 chunk 时写其 entities/poi（若有），
   删除时一并删除；`MUST NOT` 写入与 region 不对应的 entities/poi 槽位。
-- **WOS-6.6** 损坏数据 `MUST` 遵循"宁多勿少"：无法解析的 chunk 保留原字节并记录错误，`MUST NOT`
-  静默丢弃。
+- **WOS-6.6** 损坏数据 `MUST` 遵循"宁多勿少"：无法解析的 chunk（压缩方法非法、解压失败等）`MUST`
+  保留原字节并记录错误，`MUST NOT` 静默丢弃。`conformance: corrupt-chunk`
 - **WOS-6.7** 无法解析的 **region 文件**（如头部不足 8 KiB / 读取失败）在非原地模式下 `MUST` 被
   **原样复制**到输出（连同其同名 entities/poi 兄弟文件），并记录错误；`MUST NOT` 因为解析失败而
   让该文件从备份中消失。`conformance: errors-corrupt-region`
@@ -98,7 +100,7 @@
   **非 `.mca` 文件与嵌套 `.mca`** `MUST` 作为杂项原样复制（含外部存储的 `.mcc`）。
 - **WOS-7.4** `session.lock` `MUST NOT` 被复制到输出；原地替换与合并输出中的 `session.lock` `MUST` 被删除。
 - **WOS-7.5** 符号链接：发现/计数/复制 `MUST` 跟随链接目标（如 `world → 真实目录`）；删除操作
-  `MUST NOT` 跟随（避免穿链接删除源数据）。
+  `MUST NOT` 跟随（避免穿链接删除源数据）。`conformance: symlink-world`
 
 ## 8. 合并（merge）（WOS-8）
 
@@ -118,7 +120,9 @@
 ## 9. 报告、进度与退出码（WOS-9）
 
 - **WOS-9.1** `processedChunks` 语义为**访问过的区块总数**（保留 + 删除），保留数 = `processed − removed`。
-- **WOS-9.2** merge 报告字段：`mergedRegions`、`patchSlots`、`baseSlots`（回填数，不是删除数）、
+  `conformance: report-fields`
+- **WOS-9.2** 报告字段语义跨实现一致（`check_report.py` 只比较规范字段，忽略实现定义项）。
+  merge 报告字段：`mergedRegions`、`patchSlots`、`baseSlots`（回填数，不是删除数）、
   `copiedFiles`、`overlayFiles`、`linkedEntities`、`linkedPoi`、`errors`。
 - **WOS-9.3** 错误必须以 `{path, kind, message}` 结构收集；`kind` `MUST` 取自 `spec.yaml` 的枚举。
 - **WOS-9.4** 退出码：`backup` 在无 `--strict` 时即便有错误也返回 0；`--strict` 且存在错误返回 1。
@@ -172,6 +176,14 @@
 | `vectors/merge-parallel/` | WOS-8.8（并行不影响字节） | ✅ 已落地 |
 | `vectors/merge-corrupt-patch/` | WOS-8.6（回退 base） | ✅ 已落地 |
 | `vectors/overlap-rejected/` | WOS-10.1 | ✅ 已落地 |
+| `vectors/mcc-external/` | WOS-2.5、WOS-5.3、WOS-7.3（`.mcc` 随输出复制） | ✅ 已落地 |
+| `vectors/corrupt-chunk/` | WOS-6.6（损坏 chunk 保留原字节） | ✅ 已落地 |
+| `vectors/symlink-world/` | WOS-7.5（符号链接世界根） | ✅ 已落地 |
+| `vectors/report-fields/` | WOS-9.1/9.2（报告计数语义） | ✅ 已落地 |
+| `vectors/custom-compression/` | WOS-2.6（`CUSTOM(127)` 安全保留） | ✅ 已落地 |
+| `vectors/merge-overlap/` | WOS-8.1（merge 三目录互斥） | ✅ 已落地 |
+| `vectors/forceload-corrupt/` | WOS-4.4（强制加载解析失败） | ✅ 已落地 |
+| `vectors/decompress-bomb/` | WOS-10.2（解压上限安全路径） | ✅ 已落地 |
 
 ## 条款覆盖（机器生成）
 
@@ -180,13 +192,13 @@ python3 spec/tools/coverage.py            # 条款 ↔ 向量 矩阵（report-on
 python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未来可接 CI）
 ```
 
-当前：**53 条条款，36 条被向量覆盖**。未覆盖的 17 条分三类：
+当前：**53 条条款，42 条被向量覆盖**。未覆盖的 11 条分三类：
 
 | 类别 | 条款 | 说明 |
 |---|---|---|
-| 待补向量 | WOS-2.5/2.6（外部存储 `.mcc`、`CUSTOM` 压缩）、WOS-3.4（tag 读取歧义）、WOS-4.4（强制加载解析失败）、WOS-5.1/5.4（模式组合/注入）、WOS-6.6（单 chunk 损坏）、WOS-7.5（符号链接）、WOS-9.1/9.2（报告字段语义）、WOS-10.2/10.3（解压上限/删除不跟链接） | 需要专门构造的夹具，列入 S3 后续 |
-| 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现，不是行为断言 |
-| 结构性 | WOS-8.1（merge 重叠） | 与 WOS-10.1 同源，`overlap-rejected` 已覆盖 backup 侧；merge 侧可复用同一向量扩展 |
+| 待补向量 | WOS-3.4（同一 chunk 出现两个 `InhabitedTime` 时的取值口径——需要先决定语义）、WOS-10.3（删除不跟随符号链接——需构造跨链接删除场景） | 语义或夹具成本较高 |
+| 库 API | WOS-5.4（注入自定义保留模式） | 各实现 API 不同（Java `extraPatterns` / Rust `--keep-range`/`pattern()`），属 WOS-11 实现定义，不做跨语言断言 |
+| 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现 |
 
 ## 变更流程
 

@@ -53,6 +53,8 @@ jobs:
             echo "::error::spec/vectors is out of date; run spec/tools/make_vectors.py and commit";
             exit 1;
           }
+      - name: Clause coverage (report-only)
+        run: python3 spec/tools/coverage.py
       - name: Conformance (java + rust)
         run: ./scripts/conformance.sh all
       - name: Upload conformance artifacts on failure

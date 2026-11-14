@@ -1,0 +1,12 @@
+{
+  "vector": "decompress-bomb",
+  "title": "decompress-bomb",
+  "command": "backup",
+  "clauses": [
+    "WOS-10.2"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

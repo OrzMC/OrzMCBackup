@@ -1,0 +1,20 @@
+{
+  "files": [
+    {
+      "path": "level.dat",
+      "sha256": "0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 0,
+          "modified_time": 1650000000,
+          "payload_sha256": "faaecb6fdb74f8fb0e6d095cdb98b9d35efb2ce7cd42b0f89e81950d72e374e5"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "custom-compression"
+}
