@@ -28,6 +28,21 @@ git clone --recurse-submodules https://github.com/OrzMC/OrzMC.git
 git submodule update --init --recursive
 ```
 
+## 参与一致性门禁（WOS-12.5）
+
+上游实现会被 `scripts/conformance.sh upstream` 用同一批向量校验（见 `../spec/SPEC.md` §12）：
+
+```bash
+composer install --working-dir=upstream/thanos          # 一次性：安装 aternos/nbt、taskmaster、io
+./scripts/conformance.sh upstream                        # 跑全部向量；本地无 php 时自动跳过
+CONFORMANCE_REQUIRE_UPSTREAM=1 ./scripts/conformance.sh all   # CI 用法：缺 php/依赖即失败
+```
+
+- 驱动脚本：`../spec/tools/upstream_adapter.php`（上游 CLI 固定 `-t 0` 且无选项，故直接调库）
+- 结果处理：`../spec/upstream-expectations.json` 登记 `not_applicable` / `expected_failures`；
+  **未登记的不一致直接判失败**，登记了却通过报 `XPASS` 失败
+- 每一条 `expected_failures` 都必须在 `../spec/upstream-divergences.md` 有对应说明
+
 ## 升级流程（评审式）
 
 1. 在 `upstream/thanos` 中 `git fetch && git log --oneline HEAD..origin/master`；

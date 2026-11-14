@@ -24,6 +24,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          submodules: recursive
       - name: Setup Java 21
         uses: actions/setup-java@v6
         with:
@@ -45,9 +47,20 @@ jobs:
             echo "::error::spec/vectors is out of date; run spec/tools/make_vectors.py and commit";
             exit 1;
           }
+      - name: Set up PHP (upstream reference implementation)
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: zlib
+          tools: composer
+          coverage: none
+      - name: Install upstream dependencies
+        run: composer install --no-interaction --no-progress --no-scripts --working-dir=upstream/thanos
       - name: Clause coverage (report-only)
         run: python3 spec/tools/coverage.py
-      - name: Conformance (java + rust)
+      - name: Conformance (java + rust + upstream)
+        env:
+          CONFORMANCE_REQUIRE_UPSTREAM: '1'
         run: ./scripts/conformance.sh all
       - name: Upload conformance artifacts on failure
         if: failure()

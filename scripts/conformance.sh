@@ -2,7 +2,7 @@
 # 一致性校验运行器（spec/vectors → 各实现 → 中立比较）
 #
 # 用法：
-#   scripts/conformance.sh [java|rust|all|list] [--no-build] [--vectors DIR] [--keep]
+#   scripts/conformance.sh [java|rust|upstream|all|list] [--no-build] [--vectors DIR] [--keep]
 #
 # 退出码：0 = 全部通过；1 = 有失败（CI 门禁即依赖此退出码）
 set -uo pipefail
@@ -27,6 +27,16 @@ while [[ $# -gt 0 ]]; do
 done
 [[ ${#TARGETS[@]} -eq 0 ]] && TARGETS=(all)
 
+exp_field() { python3 - "$ROOT/spec/upstream-expectations.json" "$1" "$2" <<'PY'
+import json,sys
+data=json.load(open(sys.argv[1])); kind=sys.argv[2]; vec=sys.argv[3]
+for e in data.get(kind, []):
+    if e.get("vector")==vec:
+        print(e.get("reason","") or "listed")
+        sys.exit(0)
+sys.exit(1)
+PY
+}
 vec_field() { python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); v=p.get(sys.argv[2],""); print(v if isinstance(v,str) else int(v))' "$1" "$2"; }
 vec_params() { python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(" ".join(p["args"]))' "$1"; }
 
@@ -171,6 +181,72 @@ run_one() {
   return 1
 }
 
+# Upstream PHP reference implementation (spec/tools/upstream_adapter.php).
+# xfail/n-a registry: spec/upstream-expectations.json — mismatches it does not list are failures.
+run_upstream() {
+  local failures=0 total=0 xfail=0 skip=0 vec
+  echo "▶ conformance: upstream (PHP reference)"
+  if ! command -v php >/dev/null 2>&1; then
+    if [[ "${CONFORMANCE_REQUIRE_UPSTREAM:-0}" == "1" ]]; then
+      echo "::error::php is required to run the upstream conformance target"; return 1
+    fi
+    echo "  skipped: php not installed (set CONFORMANCE_REQUIRE_UPSTREAM=1 to require it)"
+    return 0
+  fi
+  if [[ ! -f "$ROOT/upstream/thanos/vendor/autoload.php" ]]; then
+    if [[ "${CONFORMANCE_REQUIRE_UPSTREAM:-0}" == "1" ]]; then
+      echo "::error::upstream dependencies missing: run composer install --working-dir=upstream/thanos"; return 1
+    fi
+    echo "  skipped: upstream/vendor missing (composer install)"
+    return 0
+  fi
+  for vec in "$VECTORS"/*/; do
+    [[ -f "$vec/params.json" ]] || continue
+    local name work out log rc reason ok=1
+    name="$(basename "$vec")"
+    if reason="$(exp_field not_applicable "$name")"; then
+      echo "  [n/a]  $name ($reason)"
+      skip=$((skip + 1))
+      continue
+    fi
+    total=$((total + 1))
+    work="$(mktemp -d "${TMPDIR:-/tmp}/conformance-upstream-${name}-XXXX")"
+    out="$work/out"
+    log="$work/run.log"
+    cp -a "$vec/input" "$work/input"
+    ( cd "$work" && php "$ROOT/spec/tools/upstream_adapter.php" \
+        --world "$work/input" --out "$out" --params "$vec/params.json" ) >"$log" 2>&1
+    rc=$?
+    ok=1
+    if [[ $rc -eq 0 ]]; then
+      python3 "$ROOT/spec/tools/manifest.py" "$out" --vector "$name" --out "$work/actual.json" >/dev/null 2>&1 \
+        && python3 "$ROOT/spec/tools/compare.py" "$vec/expected/manifest.json" "$work/actual.json" >"$work/compare.log" 2>&1 \
+        || ok=0
+    else
+      ok=0
+    fi
+    if reason="$(exp_field expected_failures "$name")"; then
+      if [[ $ok -eq 1 ]]; then
+        echo "  [XPASS] $name — listed as expected-failure but it now matches; update spec/upstream-expectations.json"
+        failures=$((failures + 1))
+      else
+        echo "  [xfail] $name ($reason)"
+        xfail=$((xfail + 1))
+      fi
+    elif [[ $ok -eq 1 ]]; then
+      echo "  [PASS] $name"
+    else
+      echo "  [FAIL] $name"
+      tail -5 "$log" 2>/dev/null | sed 's/^/      /'
+      sed -n '1,8p' "$work/compare.log" 2>/dev/null | sed 's/^/      /'
+      failures=$((failures + 1))
+    fi
+    [[ -d "$work" && $KEEP -eq 1 ]] || rm -rf "$work"
+  done
+  echo "  upstream: $((total - failures - xfail))/$total passed, $xfail xfail, $skip n/a"
+  [[ $failures -eq 0 ]]
+}
+
 run_impl() {
   local impl="$1" failures=0 total=0 vec
   echo "▶ conformance: $impl"
@@ -199,10 +275,13 @@ for t in "${TARGETS[@]}"; do
     rust)
       [[ $BUILD -eq 1 ]] && { build_rust || exit 1; }
       run_impl rust || status=1 ;;
+    upstream)
+      run_upstream || status=1 ;;
     all)
       [[ $BUILD -eq 1 ]] && { build_java && build_rust || exit 1; }
       run_impl java || status=1
-      run_impl rust || status=1 ;;
+      run_impl rust || status=1
+      run_upstream || status=1 ;;
     *) echo "::error::unknown target: $t"; exit 2 ;;
   esac
 done
