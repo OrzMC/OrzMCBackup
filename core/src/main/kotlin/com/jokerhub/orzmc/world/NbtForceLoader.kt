@@ -27,9 +27,9 @@ private const val DEFAULT_MAX_COMPOUND_DEPTH = 64
 /**
  * Full NBT parser for `chunks.dat` (GZip-compressed NBT).
  *
- * Supports all 12 standard NBT tag types and extracts force-loaded chunk
- * coordinates from both the legacy `data.Forced` (LongArray) format and the
- * newer `data.tickets[].chunk_pos` format.
+ * Extracts force-loaded chunk coordinates from both the legacy `data.Forced`
+ * (LongArray, one packed long per chunk) and the newer
+ * `data.tickets[].chunk_pos` format.
  *
  * All array/list allocations are bounded by configurable limits to prevent OOM
  * from crafted inputs.
@@ -82,10 +82,11 @@ object NbtForceLoader {
         val out = mutableListOf<Pair<Int, Int>>()
         val forced = dataTag["Forced"] as? LongArray
         if (forced != null) {
-            var i = 0
-            while (i + 1 < forced.size) {
-                out.add(Pair(forced[i].toInt(), forced[i + 1].toInt()))
-                i += 2
+            // `ForcedChunksSavedData` stores one long per chunk, packed with the vanilla
+            // `ChunkPos.toLong(x, z)` layout: x in the LOW 32 bits, z in the HIGH 32 bits.
+            // Each long is therefore a single chunk — never pair two consecutive longs.
+            for (v in forced) {
+                out.add(Pair(unpackX(v), unpackZ(v)))
             }
         }
         val tickets = dataTag["tickets"] as? List<*>
@@ -109,6 +110,12 @@ object NbtForceLoader {
         inp.readFully(b)
         return String(b, StandardCharsets.UTF_8)
     }
+
+    /** Chunk X of a vanilla `ChunkPos.toLong(x, z)` value: low 32 bits, sign preserved. */
+    private fun unpackX(packed: Long): Int = (packed and 0xFFFFFFFFL).toInt()
+
+    /** Chunk Z of a vanilla `ChunkPos.toLong(x, z)` value: high 32 bits, sign preserved. */
+    private fun unpackZ(packed: Long): Int = (packed ushr 32).toInt()
 
     private fun readList(
         inp: DataInputStream,

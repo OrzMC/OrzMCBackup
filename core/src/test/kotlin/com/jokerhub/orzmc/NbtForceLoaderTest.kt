@@ -42,6 +42,17 @@ class NbtForceLoaderTest {
         writeByte(0) // TAG_End
     }
 
+    /**
+     * Write one packed chunk position the way `ForcedChunksSavedData` does:
+     * vanilla `ChunkPos.toLong(x, z)` = x in the low 32 bits, z in the high 32 bits.
+     */
+    private fun DataOutputStream.writePackedChunk(
+        x: Int,
+        z: Int,
+    ) {
+        writeLong((z.toLong() shl 32) or (x.toLong() and 0xFFFFFFFFL))
+    }
+
     @Test
     fun `parse legacy Forced long array format`() {
         val data =
@@ -52,11 +63,10 @@ class NbtForceLoaderTest {
                 writeNbtString("data")
                 writeByte(0x0C) // TAG_Long_Array "Forced"
                 writeNbtString("Forced")
-                writeInt(4) // 4 longs = 2 chunk positions
-                writeLong(1) // chunk x=1
-                writeLong(2) // chunk z=2
-                writeLong(10) // chunk x=10
-                writeLong(20) // chunk z=20
+                writeInt(3) // one long per chunk position
+                writePackedChunk(1, 2)
+                writePackedChunk(10, 20)
+                writePackedChunk(-3, 7) // negative coordinates must survive sign extension
                 writeByte(0) // TAG_End (data)
                 writeByte(0) // TAG_End (root)
             }
@@ -69,9 +79,42 @@ class NbtForceLoaderTest {
                 },
             )
 
-        assertEquals(2, result.size, "should parse 2 forced chunks")
-        assertTrue(result.contains(1 to 2), "should contain (1, 2)")
-        assertTrue(result.contains(10 to 20), "should contain (10, 20)")
+        assertEquals(
+            listOf(1 to 2, 10 to 20, -3 to 7),
+            result,
+            "each packed long is exactly one chunk: x = low 32 bits, z = high 32 bits",
+        )
+    }
+
+    @Test
+    fun `legacy Forced never drops or merges entries`() {
+        // Real-world shape: ForcedChunksSavedData writes one long per force-loaded chunk, so an
+        // odd count is normal. Regression guard for the old "pair two longs per chunk" reader,
+        // which produced half as many chunks with scrambled coordinates.
+        val coords = (1..25).map { it to (it % 5) + 1 }
+        val data =
+            buildChunksDat {
+                writeByte(0x0A) // TAG_Compound (root)
+                writeNbtString("")
+                writeByte(0x0A) // TAG_Compound "data"
+                writeNbtString("data")
+                writeByte(0x0C) // TAG_Long_Array "Forced"
+                writeNbtString("Forced")
+                writeInt(coords.size)
+                coords.forEach { (x, z) -> writePackedChunk(x, z) }
+                writeByte(0) // TAG_End (data)
+                writeByte(0) // TAG_End (root)
+            }
+
+        val result =
+            NbtForceLoader.parse(
+                java.io.File.createTempFile("chunks", ".dat").apply {
+                    writeBytes(data)
+                    deleteOnExit()
+                },
+            )
+
+        assertEquals(coords, result, "all 25 packed longs must map 1:1 to chunk positions")
     }
 
     @Test
@@ -379,9 +422,8 @@ class NbtForceLoaderTest {
                 writeNbtString("data")
                 writeByte(0x0C) // TAG_Long_Array "Forced"
                 writeNbtString("Forced")
-                writeInt(2)
-                writeLong(7)
-                writeLong(8)
+                writeInt(1)
+                writePackedChunk(7, 8)
                 writeByte(0x0A) // TAG_Compound "lvl1" — depth 2, at the limit
                 writeNbtString("lvl1")
                 writeByte(0) // TAG_End (lvl1)

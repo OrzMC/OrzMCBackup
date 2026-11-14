@@ -10,7 +10,8 @@ import java.nio.file.Path
  *  2. `data/chunks.dat` — legacy format
  *
  * Within each file, two NBT structures are supported:
- *  - `data.Forced` (LongArray) — legacy packed 64-bit x/z pairs
+ *  - `data.Forced` (LongArray) — legacy: one long per chunk, packed as
+ *    `ChunkPos.toLong(x, z)` = x in the low 32 bits, z in the high 32 bits
  *  - `data.tickets[].chunk_pos` (IntArray[2]) — modern format with `minecraft:forced` type
  */
 object ForceLoad {
