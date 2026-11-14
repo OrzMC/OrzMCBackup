@@ -1,16 +1,13 @@
 name: java
 
 on:
+  # No path filters on purpose: these jobs carry *required* status checks, and a
+  # workflow that does not run leaves the check pending forever (a rust-only PR
+  # would block on the java matrix and vice versa).
   push:
     branches:
       - main
-    paths:
-      - 'java/**'
-      - '.github/workflows/java.yml'
   pull_request:
-    paths:
-      - 'java/**'
-      - '.github/workflows/java.yml'
 
 # P1-C3: 同一 ref 的旧 run 直接取消，避免 push 刷新时 2× 矩阵叠加跑
 concurrency:
