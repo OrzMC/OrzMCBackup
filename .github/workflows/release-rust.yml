@@ -126,7 +126,12 @@ jobs:
         run: |
           set -euo pipefail
           name="${{ steps.product.outputs.product_name }}"
-          ver="${GITHUB_REF_NAME#rust-v}"   # asset names use the bare version, not the tag
+          # On a tag push use the tag (rust-vX.Y.Z); on workflow_dispatch (dry-run) fall back to
+          # Cargo.toml so artifact names stay meaningful.
+          ver="${GITHUB_REF_NAME#rust-v}"
+          if [ "$ver" = "$GITHUB_REF_NAME" ]; then
+            ver=$(grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
           echo "version=$ver" >> "$GITHUB_OUTPUT"
           exe="${{ matrix.exe }}"
           bin="target/${{ matrix.target }}/release/${name}${exe}"
@@ -184,7 +189,13 @@ jobs:
         id: compute-sha
         run: |
           name="${{ steps.product.outputs.product_name }}"
-          tag="${GITHUB_REF_NAME#rust-v}"
+          # On a tag push use the tag (rust-vX.Y.Z); on workflow_dispatch (dry-run) fall back to
+          # Cargo.toml so artifact names stay meaningful.
+          ver="${GITHUB_REF_NAME#rust-v}"
+          if [ "$ver" = "$GITHUB_REF_NAME" ]; then
+            ver=$(grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          fi
+          tag="$ver"
           cd dist
           {
             echo "sha_arm64=$(sha256sum "$name-$tag-aarch64-apple-darwin.tar.gz" | cut -d ' ' -f1)"
@@ -253,6 +264,9 @@ jobs:
         run: |
           {
             ver="${GITHUB_REF_NAME#rust-v}"
+            if [ "$ver" = "$GITHUB_REF_NAME" ]; then
+              ver=$(cd main/rust && grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+            fi
             echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-apple-darwin.tar.gz"
             echo "url_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-apple-darwin.tar.gz"
             echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-unknown-linux-gnu.tar.gz"
