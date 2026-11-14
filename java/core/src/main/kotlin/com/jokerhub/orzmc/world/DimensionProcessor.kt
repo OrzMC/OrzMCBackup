@@ -152,9 +152,33 @@ internal object DimensionProcessor {
         var localLastEmit = lastEmit
 
         progress.emit(ProgressStage.RegionStart, null, null, rf, null)
+        val name = rf.fileName.toString()
+        val efile = entitiesDir.resolve(name)
+        val pfile = poiDir.resolve(name)
+        val targetRegion = targetDim.resolve("region").resolve(name)
+
+        // WOS-6.7：无法解析的 region 不能"消失"，否则备份会静默丢数据。原样保留该文件
+        // 及其 entities/poi 兄弟文件（无法做锁步判定，故整文件复制），并记录错误。
+        fun preserveUnprocessable() {
+            if (dryRun) return
+            listOf(
+                rf to targetRegion,
+                efile to targetDim.resolve("entities").resolve(name),
+                pfile to targetDim.resolve("poi").resolve(name),
+            ).forEach { (src, dst) ->
+                if (!fs.isRegularFile(src)) return@forEach
+                try {
+                    fs.createDirectories(dst.parent ?: targetDim)
+                    fs.copy(src, dst, true)
+                } catch (e: Exception) {
+                    onError(src, ERR_MCA, "Failed to preserve unprocessable file: ${e.message}")
+                }
+            }
+        }
         if (!McaUtils.isValidMca(fs, rf)) {
             onError(rf, ERR_MCA, "MCA file is corrupted or incomplete")
-            if (!strict) return RegionResult(0, 0)
+            preserveUnprocessable()
+            return RegionResult(0, 0)
         }
 
         // pattern 匹配：任一 pattern 命中即保留；匹配异常（损坏 chunk 无法解析）时
@@ -174,14 +198,12 @@ internal object DimensionProcessor {
             }
             return false
         }
-        val name = rf.fileName.toString()
-        val efile = entitiesDir.resolve(name)
-        val pfile = poiDir.resolve(name)
         val cr =
             try {
                 ioFactory.openReader(fs, rf)
             } catch (e: Exception) {
                 onError(rf, ERR_MCA, "Failed to read MCA file: ${e.message}")
+                preserveUnprocessable()
                 return RegionResult(0, 0)
             }
         // Defer writer creation until after we know there are entries to keep.
@@ -217,6 +239,7 @@ internal object DimensionProcessor {
                     cr.entries()
                 } catch (e: Exception) {
                     onError(rf, ERR_ENTRIES, "Failed to read chunk entries: ${e.message}")
+                    preserveUnprocessable()
                     emptyList()
                 }
             for (entry in entries) {

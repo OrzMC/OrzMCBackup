@@ -25,7 +25,10 @@ def build_manifest(world: Path, vector: str | None) -> dict:
     files = []
     for path in sorted(p for p in world.rglob("*") if p.is_file()):
         rel = path.relative_to(world).as_posix()
-        if mca.is_region_mca(path):
+        # An unparseable .mca (< 8 KiB header, e.g. a preserved corrupt region) cannot be
+        # compared slot-by-slot, so it falls back to a whole-file hash — which is exactly
+        # the "preserved verbatim" guarantee of WOS-6.7.
+        if mca.is_slot_mca(path) and path.stat().st_size >= 2 * mca.SECTOR:
             entry = {"path": rel, "slots": mca.read_slots(path)}
         else:
             entry = {"path": rel, "sha256": mca.file_sha256(path)}

@@ -126,6 +126,7 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 1. **抽象可测试性**：`FileSystem` + `McaIOFactory` 双抽象，全管道可在 `MemoryFS` 内存中运行；
    `McaMemoryBuilder`（testFixtures）在内存构建合成 MCA。
 2. **错误容错**：非致命错误收集在 `OptimizeReport.errors`，`strict` 模式升级为退出码 1。
+   无法解析的 **region 文件必须原样保留**到输出（连同 entities/poi 兄弟文件，WOS-6.7）——备份不得因解析失败丢数据。
 3. **进度报告**：两种限流——按区块数（`progressInterval`）或按时间（`progressIntervalMs`，优先）。
 4. **可扩展性**：`parallelism` 驱动 region 层并行（每个任务一个 `.mca`）；维度按序处理，避免并行度平方
    （A5 后不再有维度级并行）。
@@ -169,7 +170,7 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 用户文档（中文）：
 - `README.md` — 快速开始、CLI 参考、库用法（**改代码后必须同步**）
 - `spec/SPEC.md` — **语言无关行为规范**（条款 WOS-###，实现必须对齐）
-- `spec/vectors/` — 一致性向量（`input/` + `params.json` + `expected/manifest.json`）；`spec/tools/` 中立读取/比较器
+- `spec/vectors/` — 一致性向量 7 个（`input/` + `params.json` + `expected/manifest.json`）；`spec/tools/` 中立读取/比较器
 - `spec/divergences.md` / `spec/upstream-divergences.md` — 允许的分歧 / 与官方 PHP 的对照
 - `rust/README.md` — Rust 域构建、测试与发布
 - `upstream/README.md` — 官方 PHP 子模块的只读使用与升级流程

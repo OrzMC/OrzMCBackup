@@ -27,6 +27,7 @@ while [[ $# -gt 0 ]]; do
 done
 [[ ${#TARGETS[@]} -eq 0 ]] && TARGETS=(all)
 
+vec_field() { python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); v=p.get(sys.argv[2],""); print(v if isinstance(v,str) else int(v))' "$1" "$2"; }
 vec_params() { python3 -c 'import json,sys; p=json.load(open(sys.argv[1])); print(" ".join(p["args"]))' "$1"; }
 
 build_java() {
@@ -46,10 +47,26 @@ run_one() {
   out="$work/out"
   log="$work/run.log"
 
-  case "$impl" in
-    java) ( cd "$work" && java -jar "$JAR" "$vec/input" "$out" $args ) >"$log" 2>&1 ;;
-    rust) ( cd "$work" && "$RUST_BIN" backup "$vec/input" "$out" $args ) >"$log" 2>&1 ;;
-    *) echo "::error::unknown impl: $impl"; return 1 ;;
+  local command expect_no_output dry_run
+  command="$(vec_field "$vec/params.json" command)"
+  expect_no_output="$(vec_field "$vec/params.json" expect_no_output)"
+  dry_run="$(vec_field "$vec/params.json" dry_run)"
+  [[ "$expect_no_output" == "1" ]] && expect_no_output=true || expect_no_output=false
+  [[ "$dry_run" == "1" ]] && dry_run=true || dry_run=false
+
+  # input must be read-only for every vector: snapshot it before the run
+  python3 "$ROOT/spec/tools/manifest.py" "$vec/input" --out "$work/input-before.json" >/dev/null || return 1
+
+  # bash 3.2 (macOS) treats "${empty[@]}" under `set -u` as unbound, so use a plain string
+  local dry_args=""
+  [[ "$dry_run" == true ]] && dry_args="--dry-run"
+
+  case "$impl:$command" in
+    java:backup) ( cd "$work" && java -jar "$JAR" "$vec/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    rust:backup) ( cd "$work" && "$RUST_BIN" backup "$vec/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    java:merge) ( cd "$work" && java -jar "$JAR" merge "$vec/input/base" "$vec/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    rust:merge) ( cd "$work" && "$RUST_BIN" merge "$vec/input/base" "$vec/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    *) echo "::error::unknown impl/command: $impl/$command"; return 1 ;;
   esac
   local rc=$?
   if [[ $rc -ne 0 ]]; then
@@ -57,6 +74,23 @@ run_one() {
     tail -20 "$log" | sed 's/^/    /'
     KEEP=1
     return 1
+  fi
+
+  # input must be untouched by the run (WOS-9.5 / world safety)
+  python3 "$ROOT/spec/tools/manifest.py" "$vec/input" --out "$work/input-after.json" >/dev/null || return 1
+  if ! diff -q "$work/input-before.json" "$work/input-after.json" >/dev/null; then
+    echo "[FAIL] $impl/$name: input directory was modified by the run"
+    return 1
+  fi
+
+  if [[ "$expect_no_output" == true ]]; then
+    if [[ -e "$out" ]]; then
+      echo "[FAIL] $impl/$name: expected no output, but $out exists"
+      return 1
+    fi
+    echo "[PASS] $impl/$name (no output written)"
+    [[ $KEEP -eq 1 ]] || rm -rf "$work"
+    return 0
   fi
 
   python3 "$ROOT/spec/tools/manifest.py" "$out" --vector "$name" --out "$work/actual.json" >/dev/null || return 1

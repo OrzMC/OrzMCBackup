@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased
+
+### 行为变更（用户可见）
+- **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其 `entities`/`poi`
+  兄弟文件会被**原样复制**到输出，并记录错误（规范 WOS-6.7）。此前该 region 会从备份中缺失。
+  Rust 实现一直如此，本次对齐 Java 实现。
+
+### 新增
+- `merge --dry-run` + `--diff-file`：只预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
+- `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
+- **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、
+  `upstream/thanos`（官方 PHP，嵌套只读子模块）。命令改为 `java/gradlew -p java <task>`。
+- `scripts/conformance.sh` + `spec/vectors`（7 个向量）：跨实现一致性门禁（CI 阻断）。
+
+### 修复
+- legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
+
 ## v0.3.1 (2026-08-20)
 
 ### Bugfix

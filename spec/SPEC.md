@@ -80,6 +80,11 @@
   删除时一并删除；`MUST NOT` 写入与 region 不对应的 entities/poi 槽位。
 - **WOS-6.6** 损坏数据 `MUST` 遵循"宁多勿少"：无法解析的 chunk 保留原字节并记录错误，`MUST NOT`
   静默丢弃。
+- **WOS-6.7** 无法解析的 **region 文件**（如头部不足 8 KiB / 读取失败）在非原地模式下 `MUST` 被
+  **原样复制**到输出（连同其同名 entities/poi 兄弟文件），并记录错误；`MUST NOT` 因为解析失败而
+  让该文件从备份中消失。`conformance: errors-corrupt-region`
+  `impl:` java `world/DimensionProcessor.kt`（`preserveUnprocessable`）/ rust `world/optimizer.rs`
+  （`preserve_unprocessable`）/ upstream `absent`（上游直接中止整个任务）
   `impl:` java `mca/McaWriter.kt` + `world/DimensionProcessor.kt` / rust `mca/writer.rs` +
   `world/optimizer.rs` / upstream `Mca/McaWriter.php`（`divergent`：无 2 GiB 守卫、错误即中止）
 
@@ -134,8 +139,10 @@
 ## 12. 一致性测试（WOS-12）
 
 - **WOS-12.1** 一致性以「**manifest 等价**」判定（见 `schema/manifest.schema.json`）：
-  严格比较**文件集合**、每个 `.mca` 的**槽位占用集合**、每个槽位的 **payload SHA-256 与时间戳**、
-  杂项文件 SHA-256、报告计数与错误 `kind` 集合；忽略 §11 项。
+  严格比较**文件集合**、`region/`/`entities/`/`poi/` 下每个 `.mca` 的**槽位占用集合**、每个槽位的
+  **payload SHA-256 与时间戳**、
+  杂项文件 SHA-256、报告计数与错误 `kind` 集合；**无法解析的 `.mca`（< 8 KiB 头）按整文件 SHA-256 比较**
+  （对应 WOS-6.7 的"原样保留"）。忽略 §11 项。
 - **WOS-12.2** 期望清单 `MUST` 依据条款手工推导（`tools/make_vectors.py`，含逐条推导说明与
   provenance），`MUST NOT` 由任一被测实现的输出直接充当期望值；实际清单由中立读取器
   `tools/manifest.py` 从输出目录派生（实现不产 manifest）。比较由 `tools/compare.py` 完成。
@@ -151,11 +158,11 @@
 |---|---|---|
 | `vectors/forceload-forced/` | WOS-4.1/4.2/4.3/4.5 | ✅ 已落地（java+rust PASS；旧的双 long 解析会红） |
 | `vectors/decision-inhabited/` | WOS-3.1/3.2/3.3、WOS-5.3 | ✅ 已落地（严格 `>`、缺 tag、外部压缩） |
-| `vectors/world-basic/` | WOS-2、WOS-6、WOS-7 | 待补（S3 第二批） |
+| `vectors/world-basic/` | WOS-6.4/6.5、WOS-7.3/7.4 | ✅ 已落地 |
 | `vectors/world-26-1/` | WOS-7.1/7.2 | 待补（S3 第二批） |
-| `vectors/merge-basic/` | WOS-8 | 待补（S3 第二批） |
-| `vectors/errors/` | WOS-2.6、WOS-6.6、WOS-10.2 | 待补（S3 第二批） |
-| `vectors/cli/` | WOS-9.4/9.5 | 待补（S3 第二批） |
+| `vectors/merge-basic/` | WOS-8.2/8.3/8.4/8.5/8.7 | ✅ 已落地 |
+| `vectors/errors-corrupt-region/` | WOS-6.7（原样保留损坏 region）、WOS-9.3/9.4 | ✅ 已落地 |
+| `vectors/cli-dry-run/` | WOS-9.5 | ✅ 已落地 |
 
 ## 变更流程
 

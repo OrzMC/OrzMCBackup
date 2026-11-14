@@ -15,11 +15,11 @@
         "oneOf": [
           {
             "type": "object",
-            "description": "region/ 下的 .mca：按槽位比较（内容 + 时间戳），忽略扇区布局",
+            "description": "region/entities/poi 下的 .mca：按槽位比较（内容 + 时间戳），忽略扇区布局",
             "required": ["path", "slots"],
             "additionalProperties": false,
             "properties": {
-              "path": { "type": "string", "pattern": "(^|/)region/[^/]+\\.mca$" },
+              "path": { "type": "string", "pattern": "(^|/)(region|entities|poi)/[^/]+\\.mca$" },
               "slots": {
                 "type": "array",
                 "items": {

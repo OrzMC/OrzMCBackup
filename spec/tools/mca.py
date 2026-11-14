@@ -65,6 +65,14 @@ def read_slots(path) -> list[dict]:
         return slots
 
 
-def is_region_mca(path) -> bool:
-    """True for `*.mca` files directly inside a directory named `region`."""
-    return path.suffix == ".mca" and path.parent.name == "region"
+SLOT_DIRS = ("region", "entities", "poi")
+
+
+def is_slot_mca(path) -> bool:
+    """True for `*.mca` directly inside `region/`, `entities/` or `poi/`.
+
+    All three use the same 1024-slot archive layout, so the manifest compares them
+    slot-by-slot (WOS-12.1) instead of by whole-file hash — the file layout
+    (sector allocation) is implementation-defined (WOS-11).
+    """
+    return path.suffix == ".mca" and path.parent.name in SLOT_DIRS

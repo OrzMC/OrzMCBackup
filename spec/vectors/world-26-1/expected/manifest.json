@@ -1,0 +1,28 @@
+{
+  "files": [
+    {
+      "path": "dimensions/minecraft/overworld/data/minecraft/chunk_tickets.dat",
+      "sha256": "0b4143b6e55c04ff63e9573e6846ad39fecabbafe9d1c0d56a7fe2daaafe945f"
+    },
+    {
+      "path": "dimensions/minecraft/overworld/region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 33,
+          "modified_time": 1650000033,
+          "payload_sha256": "0119834af40467ecee810c39cece79843bc9aed67f5d63158e3c632c694319dc"
+        }
+      ]
+    },
+    {
+      "path": "level.dat",
+      "sha256": "18ce3477c2040e761bdf106bc08772398c5cf63ec87f67d90bca04bb8797b38b"
+    },
+    {
+      "path": "players/uuid.dat",
+      "sha256": "cdb59355f3ba293977fc0945fb85f11822d412c45c7520c7121bd2234f6c1f48"
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "world-26-1"
+}

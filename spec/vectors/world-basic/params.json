@@ -1,0 +1,15 @@
+{
+  "vector": "world-basic",
+  "title": "world-basic",
+  "command": "backup",
+  "clauses": [
+    "WOS-6.4",
+    "WOS-6.5",
+    "WOS-7.3",
+    "WOS-7.4"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

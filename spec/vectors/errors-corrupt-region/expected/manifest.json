@@ -1,0 +1,18 @@
+{
+  "files": [
+    {
+      "path": "entities/r.0.1.mca",
+      "sha256": "ae157a91cb428138fb18cbd64fb1eed41365d48bfb4056facbc9e1a4857ff3af"
+    },
+    {
+      "path": "level.dat",
+      "sha256": "0081779c287d567d9ca622f4c0cc2ede819b0cc7f286a5f01d8c3c0178191ad6"
+    },
+    {
+      "path": "region/r.0.1.mca",
+      "sha256": "087a3b2851ba7fe5db350ab727bb170559307024ce0ea9d764648a76d54418f9"
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "errors-corrupt-region"
+}

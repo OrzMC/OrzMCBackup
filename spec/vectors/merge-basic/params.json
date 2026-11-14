@@ -1,0 +1,13 @@
+{
+  "vector": "merge-basic",
+  "title": "merge-basic",
+  "command": "merge",
+  "clauses": [
+    "WOS-8.2",
+    "WOS-8.3",
+    "WOS-8.4",
+    "WOS-8.5",
+    "WOS-8.7"
+  ],
+  "args": []
+}
