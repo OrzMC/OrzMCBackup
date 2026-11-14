@@ -1,5 +1,8 @@
 /target/
-/.cargo/
+# Keep .cargo/config.toml (cross-compile linker + hardening flags are required by CI
+# release builds); local credentials must never be committed.
+/.cargo/*
+!/.cargo/config.toml
 **/*.DS_Store
 rust-out*/
 rust-out-test/
