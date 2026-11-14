@@ -1,5 +1,49 @@
 # Changelog
 
+## v0.3.2 (2026-11-15)
+
+### 行为变更（用户可见）
+- **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其 `entities`/`poi`
+  兄弟文件会被**原样复制**到输出，并记录错误（规范 WOS-6.7）。此前该 region 会从备份中缺失。
+  Rust 实现一直如此，本次对齐 Java 实现。
+
+### 新增
+- **上游 PHP 进入一致性门禁**（WOS-12.5）：`scripts/conformance.sh upstream` + `spec/tools/upstream_adapter.php`
+  用同一批 23 个向量驱动 `upstream/thanos`；已知分歧登记在 `spec/upstream-expectations.json`，
+  **未登记的不一致直接失败**（`XPASS` 也会失败），CI 装 PHP 8.4 后强制执行。
+- `merge --dry-run` + `--diff-file`：只预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
+- `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
+- **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、
+  `upstream/thanos`（官方 PHP，嵌套只读子模块）。命令改为 `java/gradlew -p java <task>`。
+- `scripts/conformance.sh` + `spec/vectors`（**24 个向量**）：跨实现一致性门禁（CI 阻断）；
+  条款覆盖 48/54（`spec/tools/coverage.py`）。向量覆盖：压缩矩阵、外部 `.mcc`、`CUSTOM` 压缩、
+  损坏 chunk/region、解压炸弹、符号链接世界、26.1 嵌套维度、merge 全流程与并行确定性、
+  重叠拒绝、报告字段语义、`--dry-run` 零写入。
+
+### 上游贡献
+- 向 `aternosorg/thanos` 提交 4 项：不复制 `session.lock`（[PR #28](https://github.com/aternosorg/thanos/pull/28)）、
+  Anvil 位置表溢出守卫（[PR #29](https://github.com/aternosorg/thanos/pull/29)）、
+  legacy `Forced` 的 X/Z 高低位（[issue #30](https://github.com/aternosorg/thanos/issues/30)）、
+  `InhabitedTime` 结构化取值（[issue #31](https://github.com/aternosorg/thanos/issues/31)）。
+  证据链与跟踪状态见 `spec/upstream-proposals.md`。
+
+### 性能 / 健壮性（吸收上游做法）
+- **chunk 读取改为流式**（Java + Rust）：`McaEntry.openDataStream()` / `open_data_stream()` 逐块解压、
+  按需前读，内存受**压缩块大小**约束而非解压后大小；64 MiB 上限退化为"读取量护栏"
+  （超限仍安全保留 + 记错误）。上游 PHP 一直是流式读，本次对齐并补测试。
+- 能解压但**不是合法 NBT** 的 payload 现在显式判为结构损坏 → 安全保留 + 记 `Pattern` 错误
+  （新增向量 `malformed-nbt`，24 个向量）。
+
+### 修复
+- **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
+  `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；
+  原先的纯字节前缀搜索会命中第一个匹配的字节序列，可能把该删的区块留下（或反之）。
+  两实现同步修正，向量 `inhabited-nested` 回归。
+- legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
+- **Rust CLI 的输入/输出重叠不再可能删掉源世界**：`rust-thanos backup /world /world` 原会先问
+  "是否覆盖"、答 `y` 即 `remove_dir_all(/world)`，之后才跑到重叠守卫。现在重叠守卫在任何提示/删除
+  之前执行（规范 WOS-10.1），由 `spec/vectors/overlap-rejected` 回归。
+
 ## rust-v0.0.4 (2026-11-14)
 
 首个从单仓（`OrzMC/OrzMCBackup` 的 `rust/`）发布的版本，同时**首次发布到 crates.io**。
@@ -34,50 +78,6 @@
 
 - `walkdir` / `fs_extra` 归入 `dev-dependencies`（此前在 `[dependencies]` 里未使用）。
 - CI 增加跨实现一致性门禁（与 Kotlin 实现共用 `spec/vectors` 的 24 个向量）。
-
-## Unreleased（Java）
-
-### 行为变更（用户可见）
-- **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其 `entities`/`poi`
-  兄弟文件会被**原样复制**到输出，并记录错误（规范 WOS-6.7）。此前该 region 会从备份中缺失。
-  Rust 实现一直如此，本次对齐 Java 实现。
-
-### 新增
-- **上游 PHP 进入一致性门禁**（WOS-12.5）：`scripts/conformance.sh upstream` + `spec/tools/upstream_adapter.php`
-  用同一批 23 个向量驱动 `upstream/thanos`；已知分歧登记在 `spec/upstream-expectations.json`，
-  **未登记的不一致直接失败**（`XPASS` 也会失败），CI 装 PHP 8.4 后强制执行。
-- `merge --dry-run` + `--diff-file`：只预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
-- `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式（对齐上游 API）。
-- **单仓多语言布局**：`java/`（Gradle 根）、`rust/`（原 `rust-thanos`）、`spec/`（语言无关规范 + 一致性向量）、
-  `upstream/thanos`（官方 PHP，嵌套只读子模块）。命令改为 `java/gradlew -p java <task>`。
-- `scripts/conformance.sh` + `spec/vectors`（**21 个向量**）：跨实现一致性门禁（CI 阻断）；
-  条款覆盖 46/53（`spec/tools/coverage.py`）。向量覆盖：压缩矩阵、外部 `.mcc`、`CUSTOM` 压缩、
-  损坏 chunk/region、解压炸弹、符号链接世界、26.1 嵌套维度、merge 全流程与并行确定性、
-  重叠拒绝、报告字段语义、`--dry-run` 零写入。
-
-### 上游贡献
-- 向 `aternosorg/thanos` 提交 4 项：不复制 `session.lock`（[PR #28](https://github.com/aternosorg/thanos/pull/28)）、
-  Anvil 位置表溢出守卫（[PR #29](https://github.com/aternosorg/thanos/pull/29)）、
-  legacy `Forced` 的 X/Z 高低位（[issue #30](https://github.com/aternosorg/thanos/issues/30)）、
-  `InhabitedTime` 结构化取值（[issue #31](https://github.com/aternosorg/thanos/issues/31)）。
-  证据链与跟踪状态见 `spec/upstream-proposals.md`。
-
-### 性能 / 健壮性（吸收上游做法）
-- **chunk 读取改为流式**（Java + Rust）：`McaEntry.openDataStream()` / `open_data_stream()` 逐块解压、
-  按需前读，内存受**压缩块大小**约束而非解压后大小；64 MiB 上限退化为"读取量护栏"
-  （超限仍安全保留 + 记错误）。上游 PHP 一直是流式读，本次对齐并补测试。
-- 能解压但**不是合法 NBT** 的 payload 现在显式判为结构损坏 → 安全保留 + 记 `Pattern` 错误
-  （新增向量 `malformed-nbt`，24 个向量）。
-
-### 修复
-- **`InhabitedTime` 改为结构感知扫描**（`ChunkNbtScanner`）：只接受 chunk 根层（1.18+）或
-  `root.Level`（≤1.17）的 tag，嵌套的同名 tag（如 `structures`/模组数据里的诱饵）不再影响判定；
-  原先的纯字节前缀搜索会命中第一个匹配的字节序列，可能把该删的区块留下（或反之）。
-  两实现同步修正，向量 `inhabited-nested` 回归。
-- legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
-- **Rust CLI 的输入/输出重叠不再可能删掉源世界**：`rust-thanos backup /world /world` 原会先问
-  "是否覆盖"、答 `y` 即 `remove_dir_all(/world)`，之后才跑到重叠守卫。现在重叠守卫在任何提示/删除
-  之前执行（规范 WOS-10.1），由 `spec/vectors/overlap-rejected` 回归。
 
 ## v0.3.1 (2026-08-20)
 
