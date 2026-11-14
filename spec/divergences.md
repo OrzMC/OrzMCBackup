@@ -21,4 +21,4 @@
 | # | 说明 | 决策所需信息 |
 |---|---|---|
 | C1 | `ForgeForced`（Forge `ForgeChunkManager` 写出的模组 ticket）三份实现都未解析 | 是否有目标世界使用模组区块加载器 |
-| C2 | `java` 与 `rust` 的 CLI 选项集合不完全相同（如 `--keep-range` 仅 rust） | 是否需要统一 CLI 表面（属 §11，可不统一） |
+| C2 | `java` 与 `rust` 的 CLI 选项集合不完全相同：`--keep-range` 仅 rust；`merge --dry-run` / `--diff-file` / `--diff-format` / `--diff-include-patch` / `--diff-limit` 仅 java | 是否需要统一 CLI 表面（属 §11 实现定义，可不统一）；若统一，优先把 java 的 merge 干跑清单移植到 rust |

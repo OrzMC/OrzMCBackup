@@ -30,9 +30,9 @@ Java 域双用途：CLI（picocli Shadow JAR）+ 库（Maven Central `io.github.
 
 **Java 域**（`java/`）：
 
-- Kotlin `2.4.10`，Gradle `9.7.0`（Wrapper 在 `java/`），JDK **17-29**（构建脚本显式阻止 JDK 30+）
-- 依赖：`at.yawk.lz4:lz4-java` 1.11.2、`kotlinx-coroutines-core` 1.11.0、`info.picocli` 4.7.7（仅 app）
-- 质量工具：ktlint `14.2.0`、detekt `2.0.0-alpha.6`、Kover `0.9.9`、JUnit `6.1.3`、Dokka `2.2.0`
+- Kotlin `2.4.21`，Gradle `9.9.1`（Wrapper 在 `java/`），JDK **17-29**（构建脚本显式阻止 JDK 30+）
+- 依赖：`at.yawk.lz4:lz4-java` 1.14.0、`kotlinx-coroutines-core` 1.11.0、`info.picocli` 4.7.7（仅 app）
+- 质量工具：ktlint `14.2.0`、detekt `2.0.0-alpha.6`、Kover `0.9.11`、JUnit `6.1.3`、Dokka `2.3.0`
 - 所有版本/group 由 `java/build.gradle.kts` + `java/gradle/libs.versions.toml` 统一注入；产物目标 Java 17
 - 版本目录（`java/gradle/libs.versions.toml`）是 Java 域版本号唯一事实源——改版本只改这里
 

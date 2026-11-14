@@ -97,14 +97,26 @@ Minecraft 区块一旦生成就不会自动消失。玩家探索、跑图、飞�
 
 ## 快速开始
 
-### 构建
+### 安装（预编译，推荐普通人用这条）
+
+| 渠道 | 命令 | 适用 |
+|---|---|---|
+| **Homebrew**（macOS / Linux，Rust CLI） | `brew tap orzmc/core && brew trust orzmc/core && brew install rust-thanos` | 不想装 Rust 工具链 |
+| **crates.io**（Rust CLI） | `cargo install rust-thanos` | 有 Rust 工具链，一条命令装好 |
+| **GitHub Release**（Java CLI） | 从 [`java-v0.3.2`](https://github.com/OrzMC/OrzMCBackup/releases) 下载 `backup.jar`（附 `SHA256SUMS`） | 有 JVM 17+，想要单文件 |
+| **Maven Central**（库） | `io.github.wangzhizhou:backup-core:0.3.2` | 集成进自己的工具/JVM 服务 |
+
+> 当前版本：Java `0.3.2` · Rust `0.0.4`。两个 CLI 的命令行接口一致（同一份 `spec/SPEC.md` 约束），
+> 按运行环境挑一个即可：Rust 版启动快、单二进制无依赖；Java 版与库共用同一套引擎。
+
+### 构建（从源码）
 
 ```bash
 java/gradlew -p java :app:shadowJar --no-daemon
 ```
 
 产物：`java/app/build/libs/backup.jar`（文件名固定；版本号写入 manifest，`--version` 可查）。
-本地默认版本 `0.1.0`；用 `-Pversion=X.Y.Z` 注入（如 `-Pversion=0.3.1`）。
+本地默认版本 `0.1.0`；用 `-Pversion=X.Y.Z` 注入（如 `-Pversion=0.3.2`）。
 
 ### 优化备份
 
@@ -152,7 +164,7 @@ java -jar backup.jar WORLD_DIR [OUTPUT_DIR] [options]
 | `--remove-unknown` | `false` | 将未知/外部压缩的区块视为可删除 |
 | `--progress-mode` | `Region` | 进度模式：`Off` / `Global` / `Region` |
 | `--in-place` | `false` | 原地处理，替换输入目录 |
-| `--zip-output` | `false` | 输出目录打包为时间戳 zip 并删除目录 |
+| `--zip-output` | `false` | 输出目录打包为**平级**的 `yyyyMMddHHmmss.zip` 并删除原目录 |
 | `-f`, `--force` | `false` | 覆盖已存在且非空的输出目录（无交互） |
 | `--strict` | `false` | 严格模式：出错时返回非零退出码 |
 | `--report` | `false` | 标准输出打印处理统计与错误列表 |
@@ -183,8 +195,8 @@ java -jar backup.jar merge BASE PATCH OUTPUT [options]
 | `--report` | `false` | 标准输出打印合并统计 |
 | `--report-file` / `--report-format` | `null` / `json` | 报告写文件（`json` / `csv`） |
 | `--no-fsync` | `false` | 跳过 region 写入完成后的 `fsync()` 刷盘（更快，但异常掉电时持久性稍弱） |
-| `--dry-run` | `false` | 只预览槽位级合并决策，不创建/不修改任何东西 |
-| `--diff-file` | `null` | 写 chunk 级差异清单（可与真实合并同时用：先出清单再合并） |
+| `--dry-run` | `false` | 只预览槽位级合并决策，不创建/不修改任何东西（**仅 Java 版**，Rust 待补齐） |
+| `--diff-file` | `null` | 写 chunk 级差异清单（可与真实合并同时用：先出清单再合并；**仅 Java 版**） |
 | `--diff-format` | `csv` | 清单格式：`csv` / `json` / `text` |
 | `--diff-include-patch` | `false` | 清单额外包含取自 patch 的槽位（行数极大） |
 | `--diff-limit` | `0` | 清单行数硬上限（0 = 不限） |
@@ -312,7 +324,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 
 | 文档 | 内容 |
 |------|------|
-| [`docs/FEATURES.md`](docs/FEATURES.md) | 功能点全量梳理、配置模型、参数速查（v0.3.1） |
+| [`docs/FEATURES.md`](docs/FEATURES.md) | 功能点全量梳理、配置模型、参数速查（v0.3.2） |
 | [`docs/threshold-benchmark-report.md`](docs/threshold-benchmark-report.md) | 真实世界 6 档阈值（0/60/120/180/240/300s）性能与效果对比、逐字节完整性验证 |
 | [`docs/papermc-map-backup-recovery-case.md`](docs/papermc-map-backup-recovery-case.md) | merge 真实案例、算法与三重验收方法 |
 | [`docs/real-world-backup-validation.md`](docs/real-world-backup-validation.md) | 真实世界备份验证、阈值对比、丢失文件分类 |
@@ -338,13 +350,14 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 ```bash
 java/gradlew -p java :core:test :app:test --no-daemon   # 全部测试
 java/gradlew -p java ktlintCheck detekt --no-daemon     # 代码风格与静态分析
+./scripts/conformance.sh all                            # 跨域一致性门禁（java + rust + 上游 PHP）
 ```
 
 ---
 
 ## 构建与发布
 
-- **环境**：Gradle Wrapper `9.7.0`（位于 `java/`）；JDK **17-29**（构建脚本阻止 30+）；产物目标 Java 17
+- **环境**：Gradle Wrapper `9.9.1`（位于 `java/`）；JDK **17-29**（构建脚本阻止 30+）；产物目标 Java 17
 - **版本管理**：根 `build.gradle.kts` + `gradle/libs.versions.toml` 统一注入；`-Pversion=X.Y.Z` 覆盖
 - **本地构建 CLI**：`java/gradlew -p java :app:shadowJar --no-daemon`
 - **库发布**：`java/gradlew -p java :core:portalBundle -Pversion=X.Y.Z -Psigning.keyId=... -Psigning.password=... -Psigning.key=...`
@@ -359,6 +372,11 @@ java/gradlew -p java ktlintCheck detekt --no-daemon     # 代码风格与静态�
 |---|---|
 | Java（`backup.jar`） | GitHub Release（jar + sha256）、Maven Central（`io.github.wangzhizhou:backup-core`） |
 | Rust（`rust-thanos`） | crates.io（`cargo install rust-thanos` / 库依赖）、GitHub Release（6 平台 tar.gz/zip）、Homebrew tap（`orzmc/core`） |
+
+Homebrew 公式由 `release-rust.yml` 的 `update-homebrew-tap` 作业自动渲染并提交到
+[`OrzMC/homebrew-core`](https://github.com/OrzMC/homebrew-core)（sha256 取自 Release 资产）。
+需要补发/修正历史版本的公式时，跑 `gh workflow run release-rust.yml -f mode=homebrew -f tag=rust-v0.0.4`
+—— 不会重新构建或改动已发布的 crate/Release。
 
 ---
 

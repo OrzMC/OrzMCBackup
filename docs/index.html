@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Minecraft Java 世界优化备份工具：按玩家活跃时间（InhabitedTime）逐区块裁剪世界体积，实测 -88.3% 零非预期数据丢失；优化备份与全量备份可槽位级合并恢复。">
+<meta name="description" content="Minecraft Java 世界优化备份工具：按玩家活跃时间（InhabitedTime）逐区块裁剪世界体积，实测 -88.3% 零非预期数据丢失；优化备份与全量备份可槽位级合并恢复。Kotlin + Rust 双实现，共享一份一致性规范；Homebrew / crates.io / 单文件 JAR 三种安装方式。">
 <meta property="og:title" content="OrzMCBackup — Minecraft 世界优化备份工具">
-<meta property="og:description" content="按玩家活跃时间逐区块裁剪世界体积：实测 -88.3%，零非预期数据丢失，支持槽位级合并恢复。">
+<meta property="og:description" content="按玩家活跃时间逐区块裁剪世界体积：实测 -88.3%，零非预期数据丢失，支持槽位级合并恢复。Kotlin + Rust 双实现，Homebrew / crates.io / JAR 安装。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://orzmc.github.io/OrzMCBackup/">
 <title>OrzMCBackup — Minecraft 世界优化备份工具</title>
@@ -235,6 +235,7 @@ footer a:hover { color: var(--green); }
       <a href="#metrics">实测效果</a>
       <a href="#features">核心特性</a>
       <a href="#how">工作原理</a>
+      <a href="#install">安装</a>
       <a href="#quickstart">快速开始</a>
       <a href="#docs">文档</a>
       <a class="btn nav-btn" href="https://github.com/OrzMC/OrzMCBackup" target="_blank" rel="noopener">GitHub ↗</a>
@@ -244,11 +245,12 @@ footer a:hover { color: var(--green); }
 
 <header class="hero">
   <div class="container">
-    <span class="tag">开源 · Apache-2.0 · Kotlin — 面向 PaperMC / Vanilla</span>
+    <span class="tag">开源 · Apache-2.0 · Kotlin + Rust — 面向 PaperMC / Vanilla</span>
     <h1>Minecraft 世界优化备份工具</h1>
     <p class="sub">
       按玩家活跃时间（InhabitedTime）<strong>逐区块裁剪世界体积</strong>——备份更小、恢复更快、保留更高频。
       优化备份与全量备份可<strong>槽位级合并恢复</strong>，实测<strong>零非预期数据丢失</strong>。
+      Kotlin 与 Rust 两份实现共享同一份规范与一致性向量，行为可逐字节对照上游。
     </p>
     <div class="cta-row">
       <a class="btn btn-solid btn-lg" href="#quickstart">快速开始</a>
@@ -259,6 +261,7 @@ footer a:hover { color: var(--green); }
       <span class="chip"><span class="num">92.7%</span> 区块剔除</span>
       <span class="chip"><span class="num">0</span> 非预期数据丢失</span>
       <span class="chip"><span class="num">26.1+</span> 新格式</span>
+      <span class="chip"><span class="num">24</span> 一致性向量</span>
     </div>
   </div>
 </header>
@@ -409,7 +412,17 @@ footer a:hover { color: var(--green); }
       </div>
       <div class="card">
         <h3>🔁 merge 槽位级合并恢复</h3>
-        <p>优化备份 + 全量备份按 chunk 槽位粒度合并，patch 优先、base 填空槽；损坏 patch 自动回退 base。</p>
+        <p>优化备份 + 全量备份按 chunk 槽位粒度合并，patch 优先、base 填空槽；损坏 patch 自动回退 base。
+          <span class="kbd">merge --dry-run --diff-file</span> 先出逐 chunk 回退清单，确认后再落盘（Java 版提供）。</p>
+      </div>
+      <div class="card">
+        <h3>📐 一份规范，两套实现</h3>
+        <p>语言无关的 <span class="kbd">spec/</span>（WOS-### 条款 + 一致性向量）是真值：Kotlin 与 Rust 都要通过
+          <span class="kbd">scripts/conformance.sh</span>，分歧必须登记，未登记即失败。</p>
+      </div>
+      <div class="card">
+        <h3>🧪 与上游逐字节对照</h3>
+        <p>官方 PHP 实现作为只读参考一起进一致性门禁（允许的差异登记为 xfail），发现的缺陷已回馈上游。</p>
       </div>
     </div>
   </div>
@@ -435,29 +448,68 @@ footer a:hover { color: var(--green); }
   </div>
 </section>
 
+<section id="install">
+  <div class="container">
+    <h2>安装</h2>
+    <p class="section-sub">
+      三种装法任选其一。两个 CLI（Rust 的 <code>rust-thanos</code> 与 Java 的 <code>backup.jar</code>）
+      参数完全一致——都受同一份 <code>spec/SPEC.md</code> 约束，按运行环境挑一个即可。
+    </p>
+
+    <div class="codeblock">
+      <div class="codebar"><span>bash — Homebrew（macOS / Linux，Rust CLI）</span><button class="copy" type="button">复制</button></div>
+      <pre><code>brew tap orzmc/core
+brew trust orzmc/core      # 新版 Homebrew 要求第三方 tap 显式信任
+brew install rust-thanos</code></pre>
+    </div>
+
+    <div class="codeblock">
+      <div class="codebar"><span>bash — crates.io（需要 Rust 工具链）</span><button class="copy" type="button">复制</button></div>
+      <pre><code>cargo install rust-thanos      # 装到 ~/.cargo/bin</code></pre>
+    </div>
+
+    <div class="codeblock">
+      <div class="codebar"><span>bash — 单文件 JAR（需要 JVM 17+）</span><button class="copy" type="button">复制</button></div>
+      <pre><code>curl -LO https://github.com/OrzMC/OrzMCBackup/releases/download/java-v0.3.2/backup.jar
+java -jar backup.jar --version</code></pre>
+    </div>
+
+    <p class="code-note">
+      当前版本：Rust <code>0.0.4</code> · Java <code>0.3.2</code>；公式与二进制由
+      <code>release-rust.yml</code> 自动发布到
+      <a href="https://github.com/OrzMC/homebrew-core" target="_blank" rel="noopener">OrzMC/homebrew-core</a>。
+      需要从源码构建或作为库集成，见
+      <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/README.md" target="_blank" rel="noopener">README</a>。
+    </p>
+  </div>
+</section>
+
 <section id="quickstart">
   <div class="container">
     <h2>快速开始</h2>
-    <p class="section-sub">JDK 17-29 环境，一条命令构建 CLI fat JAR。</p>
+    <p class="section-sub">装好之后，三条命令覆盖「预览 → 备份 → 合并恢复」。</p>
 
     <div class="codeblock">
-      <div class="codebar"><span>bash — 构建 CLI</span><button class="copy" type="button">复制</button></div>
-      <pre><code>./gradlew :app:shadowJar --no-daemon</code></pre>
+      <div class="codebar"><span>bash — 预览将剔除多少区块（不写盘）</span><button class="copy" type="button">复制</button></div>
+      <pre><code>rust-thanos backup /path/to/world --dry-run --report</code></pre>
     </div>
 
     <div class="codeblock">
       <div class="codebar"><span>bash — 优化备份（默认阈值 5 分钟）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>java -jar app/build/libs/backup.jar /path/to/world /path/to/out -t 300 --zip-output</code></pre>
+      <pre><code>rust-thanos backup /path/to/world /path/to/out -t 300 --zip-output</code></pre>
     </div>
 
     <div class="codeblock">
       <div class="codebar"><span>bash — merge 合并恢复（BASE=更早全量，PATCH=优化备份）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>java -jar app/build/libs/backup.jar merge BASE PATCH OUTPUT --report --progress-mode Global</code></pre>
+      <pre><code>rust-thanos merge BASE PATCH OUTPUT --report --progress-mode global</code></pre>
     </div>
 
     <p class="code-note">
-      提示：先用 <code>--dry-run --report</code> 预览将剔除的区块量；<code>-t 0</code> 会移除所有未被访问的区块，
-      建议保留一份全量备份以便需要时 merge 恢复。
+      Rust 版的备份要显式写 <code>backup</code> 子命令（<code>rust-thanos backup …</code>）；
+      Java 版省略子命令即为备份（<code>java -jar backup.jar …</code>），<code>merge</code> 两边一致，其余参数相同。
+      先用 <code>--dry-run --report</code> 预览将剔除的区块量；<code>-t 0</code> 会移除所有未被访问的区块，
+      建议保留一份全量备份以便需要时 merge 恢复。从源码构建：
+      <code>java/gradlew -p java :app:shadowJar --no-daemon</code> → <code>java/app/build/libs/backup.jar</code>。
     </p>
   </div>
 </section>
@@ -468,12 +520,15 @@ footer a:hover { color: var(--green); }
     <p class="section-sub">从功能梳理到真实案例分析，一站式了解。</p>
     <div class="doc-grid">
       <a class="doc" href="doc.html?file=threshold-benchmark-report.md"><div class="t">阈值基准测试报告</div><div class="d">18.6GB 真实世界六档阈值（0/60/…/300s）性能与效果、逐字节完整性验证</div></a>
-      <a class="doc" href="doc.html?file=FEATURES.md"><div class="t">功能点全量梳理</div><div class="d">配置模型、参数速查、CLI / 库用法（v0.2.3）</div></a>
+      <a class="doc" href="doc.html?file=FEATURES.md"><div class="t">功能点全量梳理</div><div class="d">配置模型、参数速查、CLI / 库用法（v0.3.2）</div></a>
       <a class="doc" href="doc.html?file=real-world-backup-validation.md"><div class="t">真实世界验证报告</div><div class="d">18.6GB 真实世界、阈值对比、丢失文件分类</div></a>
       <a class="doc" href="doc.html?file=papermc-map-backup-recovery-case.md"><div class="t">merge 真实恢复案例</div><div class="d">18.64GB 全量 + 2.18GB 优化的槽位级合并算法</div></a>
       <a class="doc" href="doc.html?file=market-positioning-analysis.md"><div class="t">市场定位与产品化分析</div><div class="d">痛点、竞品对比与商业化方向</div></a>
       <a class="doc" href="doc.html?file=architecture-review.md"><div class="t">架构与测试审查报告</div><div class="d">P0–P3 改进路线、A1–A20 架构审计、T1–T13 测试审计、C1–C23 CI 审计</div></a>
       <a class="doc" href="doc.html?file=upstream-comparison.md"><div class="t">与上游 thanos 的差异对照</div><div class="d">功能对照、legacy Forced 打包修复、有意保留的差异与潜在增强</div></a>
+      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/SPEC.md"><div class="t">行为规范（spec/SPEC.md）</div><div class="d">语言无关条款 WOS-1..12：两份实现与上游对照的唯一真值</div></a>
+      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/tree/main/spec/vectors"><div class="t">一致性向量</div><div class="d">24 组字节级输入/期望清单，Java、Rust、上游 PHP 中立比对</div></a>
+      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/upstream-proposals.md"><div class="t">上游改进与分歧</div><div class="d">回馈 aternosorg/thanos 的 PR / issue 与跟踪状态</div></a>
       <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/README.md"><div class="t">README</div><div class="d">快速开始、CLI 参考、作为库使用</div></a>
       <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/CHANGELOG.md"><div class="t">CHANGELOG</div><div class="d">版本历史与变更说明</div></a>
     </div>
@@ -484,9 +539,9 @@ footer a:hover { color: var(--green); }
   <div class="container">
     <div class="cta-banner">
       <h2>优化你的世界备份</h2>
-      <p>从 18.6 GB 到 2.2 GB，数据零非预期丢失——现在就试。</p>
+      <p>从 18.6 GB 到 2.2 GB，数据零非预期丢失——<code>brew install rust-thanos</code> 就能开始。</p>
       <div class="cta-row" style="justify-content: center; margin-bottom: 0;">
-        <a class="btn btn-solid btn-lg" href="#quickstart">开始使用</a>
+        <a class="btn btn-solid btn-lg" href="#install">开始使用</a>
         <a class="btn btn-lg" href="https://github.com/OrzMC/OrzMCBackup/releases" target="_blank" rel="noopener">下载 Release</a>
       </div>
     </div>
@@ -496,13 +551,19 @@ footer a:hover { color: var(--green); }
 <footer>
   <div class="container">
     <div class="badges">
-      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-lib.yml/badge.svg" alt="release-lib"></a>
-      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-app.yml/badge.svg" alt="release-app"></a>
-      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/test-matrix.yml/badge.svg" alt="test-matrix"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/java.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/java.yml/badge.svg" alt="java"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml/badge.svg" alt="rust"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/conformance.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/conformance.yml/badge.svg" alt="conformance"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-app.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-java-app.yml/badge.svg" alt="release-java-app"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-rust.yml"><img src="https://github.com/OrzMC/OrzMCBackup/actions/workflows/release-rust.yml/badge.svg" alt="release-rust"></a>
       <a href="https://codecov.io/gh/OrzMC/OrzMCBackup"><img src="https://codecov.io/gh/OrzMC/OrzMCBackup/branch/main/graph/badge.svg" alt="codecov"></a>
-      <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="license"></a>
+      <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue" alt="license"></a>
     </div>
-    <p>© 2026 wangzhizhou · <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/LICENSE">Apache-2.0</a> · <a href="https://github.com/OrzMC/OrzMCBackup" target="_blank" rel="noopener">GitHub</a> · 致谢 <a href="https://github.com/aternosorg/thanos" target="_blank" rel="noopener">Aternos/Thanos</a></p>
+    <p>© 2026 wangzhizhou · <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/LICENSE">Apache-2.0</a> ·
+      <a href="https://github.com/OrzMC/OrzMCBackup" target="_blank" rel="noopener">GitHub</a> ·
+      <a href="https://github.com/OrzMC/homebrew-core" target="_blank" rel="noopener">Homebrew tap</a> ·
+      <a href="https://crates.io/crates/rust-thanos" target="_blank" rel="noopener">crates.io</a> ·
+      致谢 <a href="https://github.com/aternosorg/thanos" target="_blank" rel="noopener">Aternos/Thanos</a></p>
   </div>
 </footer>
 
