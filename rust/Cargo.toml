@@ -26,7 +26,7 @@ env_logger = "0.11"
 indicatif = "0.17"
 console = "0.15"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
-zip = "0.6"
+zip = "9"
 
 [dev-dependencies]
 # Test-only helpers: copying fixture worlds and walking temp trees.
