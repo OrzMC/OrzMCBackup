@@ -102,7 +102,11 @@ class Main : Callable<Int> {
     )
     var progressIntervalMs: Long = 0
 
-    @Option(names = ["--parallelism"], description = ["Parallel dimension processing threads"], defaultValue = "1")
+    @Option(
+        names = ["--parallelism"],
+        description = ["Parallel region-file worker threads (dimensions are processed serially)"],
+        defaultValue = "1",
+    )
     var parallelism: Int = 1
 
     @Option(

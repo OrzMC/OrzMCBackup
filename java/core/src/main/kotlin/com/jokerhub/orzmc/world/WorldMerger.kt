@@ -39,6 +39,19 @@ interface MergeEngine {
 object WorldMerger {
     @JvmStatic
     fun run(request: MergeRequest): MergeReport = DefaultMerger.run(request)
+
+    /**
+     * Read-only preview of what [run] would do, at chunk-slot granularity.
+     *
+     * Nothing is created, deleted or modified: [MergeRequest.output] may not even exist.
+     * The returned [MergeDiffReport] carries exact slot counts plus the chunk-level rows
+     * selected by [options] (base-filled slots by default, i.e. "what reverts to an older copy").
+     */
+    @JvmStatic
+    fun dryRun(
+        request: MergeRequest,
+        options: MergeDiffOptions = MergeDiffOptions(),
+    ): MergeDiffReport = MergeDiff.compute(request, options)
 }
 
 object DefaultMerger : MergeEngine {

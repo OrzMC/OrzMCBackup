@@ -65,6 +65,41 @@ class MergeCommand : Callable<Int> {
     @Option(names = ["--report"], description = ["Print summary report"], defaultValue = "false")
     var report: Boolean = false
 
+    @Option(
+        names = ["--dry-run"],
+        description = ["Preview the slot-level merge decision and write nothing"],
+        defaultValue = "false",
+    )
+    var dryRun: Boolean = false
+
+    @Option(
+        names = ["--diff-file"],
+        description = ["Write a chunk-level diff of the merge decision (see --diff-format)"],
+        required = false,
+    )
+    var diffFile: Path? = null
+
+    @Option(
+        names = ["--diff-format"],
+        description = ["Diff format: csv | json | text"],
+        defaultValue = "csv",
+    )
+    var diffFormat: String = "csv"
+
+    @Option(
+        names = ["--diff-include-patch"],
+        description = ["Also emit diff rows for chunks taken from PATCH (much larger output)"],
+        defaultValue = "false",
+    )
+    var diffIncludePatch: Boolean = false
+
+    @Option(
+        names = ["--diff-limit"],
+        description = ["Hard cap on emitted diff rows (0 = unlimited; counts stay exact)"],
+        defaultValue = "0",
+    )
+    var diffLimit: Int = 0
+
     @Option(names = ["--report-file"], description = ["Write report to file (JSON/CSV)"], required = false)
     var reportFile: Path? = null
 
@@ -108,7 +143,7 @@ class MergeCommand : Callable<Int> {
                     hooks = Hooks(),
                     io = IOOptions(syncOnFinalize = !noFsync),
                 )
-            val r = WorldMerger.run(request)
+            val r = runMergeOrDryRun(request)
             if (report) logger.info(MergeReportIO.toText(r))
             reportFile?.let { path ->
                 MergeReportIO.write(r, path, reportFormat)
@@ -122,4 +157,27 @@ class MergeCommand : Callable<Int> {
             logger.error("发生错误：" + (e.message ?: e.toString()))
             1
         }
+
+    /**
+     * Runs the merge, unless `--dry-run` is set.
+     *
+     * A dry run (or `--diff-file` alone) first computes the read-only slot-level diff, then:
+     * `--dry-run` stops there (nothing is created on disk), `--diff-file` writes the diff and
+     * the real merge continues, so the audit file describes exactly what is about to happen.
+     */
+    private fun runMergeOrDryRun(request: MergeRequest): MergeReport {
+        if (!dryRun && diffFile == null) return WorldMerger.run(request)
+        val diff =
+            WorldMerger.dryRun(
+                request,
+                MergeDiffOptions(includePatchRows = diffIncludePatch, maxRows = diffLimit),
+            )
+        if (report || dryRun) logger.info(MergeDiffIO.toText(diff))
+        diffFile?.let { path ->
+            MergeDiffIO.write(diff, path, diffFormat)
+            logger.info("差异清单已写入：$path")
+        }
+        if (dryRun) return MergeReport(errors = diff.errors)
+        return WorldMerger.run(request)
+    }
 }
