@@ -178,8 +178,8 @@ impl McaWriterLike for MemoryMcaWriter {
             loc.extend_from_slice(&v.to_be_bytes());
         }
         let mut time = Vec::with_capacity(4096);
-        for i in 0..1024 {
-            time.extend_from_slice(&self.timestamps[i].to_be_bytes());
+        for ts in &self.timestamps {
+            time.extend_from_slice(&ts.to_be_bytes());
         }
         self.data[0..4096].copy_from_slice(&loc);
         self.data[4096..8192].copy_from_slice(&time);
