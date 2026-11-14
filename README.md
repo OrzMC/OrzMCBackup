@@ -358,7 +358,7 @@ java/gradlew -p java ktlintCheck detekt --no-daemon     # 代码风格与静态�
 | 实现 | 渠道 |
 |---|---|
 | Java（`backup.jar`） | GitHub Release（jar + sha256）、Maven Central（`io.github.wangzhizhou:backup-core`） |
-| Rust（`rust-thanos`） | crates.io（`cargo install rust-thanos` / 库依赖）、GitHub Release（6 平台 tar.gz/zip）、Homebrew tap（`orzgeeker/core`） |
+| Rust（`rust-thanos`） | crates.io（`cargo install rust-thanos` / 库依赖）、GitHub Release（6 平台 tar.gz/zip）、Homebrew tap（`orzmc/core`） |
 
 ---
 

@@ -4,7 +4,7 @@
 [![rust](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml/badge.svg)](https://github.com/OrzMC/OrzMCBackup/actions/workflows/rust.yml)
 
 > 本目录是 [OrzMCBackup](https://github.com/OrzMC/OrzMCBackup) 单仓中的 **Rust 域**（原独立仓库
-> `OrzMC/rust-thanos` 的代码与历史由归档仓保留）。行为真值见仓库根的 `spec/`，与 `java/` 域并列。
+> `OrzGeeker/rust-thanos` 的代码与历史由归档仓保留）。行为真值见仓库根的 `spec/`，与 `java/` 域并列。
 
 高效的 Minecraft Java 世界优化工具。检测并删除未使用的区块，减少世界文件大小，提高游戏性能；并提供 **merge 合并恢复** 命令，把优化后的世界安全合并回完整备份。
 
@@ -30,7 +30,7 @@
 |---|---|---|
 | **crates.io**（CLI） | `cargo install rust-thanos` | 有 Rust 工具链，想要一条命令装好 |
 | **crates.io**（库） | `rust-thanos = "0.0"`（Cargo.toml） | 嵌入到自己的 Rust 工具里 |
-| **Homebrew**（macOS/Linux） | `brew tap orzgeeker/core && brew install rust-thanos` | 不想装 Rust 工具链 |
+| **Homebrew**（macOS/Linux） | `brew tap orzmc/core && brew install rust-thanos` | 不想装 Rust 工具链 |
 | **预编译二进制** | 见下文 Releases 页（6 平台） | 无运行时依赖，解压即用 |
 | **源码构建** | `git clone … && cd OrzMCBackup/rust && cargo build --release` | 需要改动代码 / 审计 |
 
@@ -58,13 +58,13 @@ rust-thanos = "0.0"
 
 ```bash
 # 添加私有源
-brew tap orzgeeker/core
+brew tap orzmc/core
 # 安装
 brew install rust-thanos
 # 卸载
 brew uninstall rust-thanos
 # 移除私有源
-brew untap orzgeeker/core
+brew untap orzmc/core
 ```
 
 ### 从源代码构建
@@ -361,6 +361,6 @@ MIT — 查看 [LICENSE](LICENSE)。
 
 ## 📞 相关链接
 
-- 项目：[https://github.com/OrzMC/rust-thanos](https://github.com/OrzMC/rust-thanos)
-- 报告问题：[Issues](https://github.com/OrzMC/rust-thanos/issues)
+- 项目：[https://github.com/OrzMC/OrzMCBackup](https://github.com/OrzMC/OrzMCBackup)
+- 报告问题：[Issues](https://github.com/OrzMC/OrzMCBackup/issues)
 - [Minecraft 区域文件格式](https://minecraft.fandom.com/wiki/Region_file_format) · [NBT 格式](https://minecraft.fandom.com/wiki/NBT_format) · [Rust](https://www.rust-lang.org/)
