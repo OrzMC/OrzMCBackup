@@ -349,8 +349,16 @@ java/gradlew -p java ktlintCheck detekt --no-daemon     # 代码风格与静态�
 - **本地构建 CLI**：`java/gradlew -p java :app:shadowJar --no-daemon`
 - **库发布**：`java/gradlew -p java :core:portalBundle -Pversion=X.Y.Z -Psigning.keyId=... -Psigning.password=... -Psigning.key=...`
   生成 `java/core/build/portal-bundle.zip`（含 GPG 签名 + sources + javadoc），上传 Maven Central Publisher Portal
-- **GitHub Actions**：`release-app.yml` 发布 CLI 到 GitHub Release；`release-lib.yml` 发布库到 Maven Central；
-  两者使用 **Temurin 21** 构建（lint/coverage 用 JDK 25）
+- **GitHub Actions**：`release-java-app.yml` 发布 CLI 到 GitHub Release；`release-java-lib.yml` 发布库到 Maven Central；
+  `release-rust.yml` 发布 Rust CLI（GitHub Release 6 平台预编译 + Homebrew formula + **crates.io**）；
+  Java 用 **Temurin 21** 构建（lint/coverage 用 JDK 25）
+
+### 分发渠道一览
+
+| 实现 | 渠道 |
+|---|---|
+| Java（`backup.jar`） | GitHub Release（jar + sha256）、Maven Central（`io.github.wangzhizhou:backup-core`） |
+| Rust（`rust-thanos`） | crates.io（`cargo install rust-thanos` / 库依赖）、GitHub Release（6 平台 tar.gz/zip）、Homebrew tap（`orzgeeker/core`） |
 
 ---
 
