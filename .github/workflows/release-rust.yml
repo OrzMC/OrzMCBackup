@@ -253,6 +253,7 @@ jobs:
           rustflags: ""
       - name: Determine product name
         id: product_main
+        if: steps.guard.outputs.skip != 'true' 
         run: |
           cd main/rust
           name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
