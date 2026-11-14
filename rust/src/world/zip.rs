@@ -9,7 +9,7 @@ use crate::world::fs::FileSystem;
 use anyhow::Result;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use zip::write::FileOptions;
+use zip::write::SimpleFileOptions;
 
 /// Compress `root` into a sibling `yyyyMMddHHmmss.zip` next to it (outside the
 /// walked tree), and return the archive path. Mirrors OrzMCBackup's
@@ -26,7 +26,8 @@ pub fn compress_to_timestamp_zip(fs: &dyn FileSystem, root: &Path) -> Result<Pat
     let mut data = Vec::new();
     {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut data));
-        let options = FileOptions::default().compression_method(zip::CompressionMethod::Deflated);
+        let options =
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated);
         for p in fs.walk(root, false)? {
             let rel = p.strip_prefix(root)?;
             if rel.as_os_str().is_empty() {
