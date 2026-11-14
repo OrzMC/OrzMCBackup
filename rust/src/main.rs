@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use rust_thanos::world::{
-    merge, optimize, MergeReportIO, MergeRequestBuilder, OptimizerRequestBuilder, ProgressMode,
-    ProgressSink, RangePattern, ReportFormat, ReportIO, TermProgressSink,
+    ensure_no_overlap, merge, optimize, MergeReportIO, MergeRequestBuilder,
+    OptimizerRequestBuilder, ProgressMode, ProgressSink, RangePattern, ReportFormat, ReportIO,
+    TermProgressSink,
 };
 use std::io::Write;
 use std::path::PathBuf;
@@ -197,6 +198,14 @@ fn main() -> Result<()> {
 }
 
 fn cmd_backup(args: BackupArgs) -> Result<()> {
+    // WOS-10.1: reject an overlapping output *before* any prompt or deletion. The interactive
+    // "overwrite?" path below deletes the output directory, so it must never run when the output
+    // aliases the input world (answering "y" would otherwise erase the source).
+    if !args.in_place && !args.dry_run {
+        if let Some(ref out_dir) = args.output {
+            ensure_no_overlap(&args.input, Some(out_dir))?;
+        }
+    }
     if !args.in_place {
         if let Some(ref out_dir) = args.output {
             if out_dir.exists() {

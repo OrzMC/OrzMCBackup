@@ -2,10 +2,17 @@
   "vector": "decision-inhabited",
   "title": "decision-inhabited",
   "clauses": [
+    "WOS-1.1",
+    "WOS-1.2",
+    "WOS-2.1",
+    "WOS-2.2",
+    "WOS-2.3",
     "WOS-3.1",
     "WOS-3.2",
     "WOS-3.3",
-    "WOS-5.3"
+    "WOS-5.3",
+    "WOS-6.2",
+    "WOS-6.3"
   ],
   "command": "backup",
   "args": [

@@ -46,41 +46,73 @@ run_one() {
   work="$(mktemp -d "${TMPDIR:-/tmp}/conformance-${impl}-${name}-XXXX")"
   out="$work/out"
   log="$work/run.log"
+  # run against a private copy so a vector may legitimately stress destructive paths
+  # (overlap guards) without endangering the committed fixtures
+  cp -a "$vec/input" "$work/input"
 
-  local command expect_no_output dry_run
+  local command expect_no_output dry_run expect_exit output_override
   command="$(vec_field "$vec/params.json" command)"
+  expect_exit="$(vec_field "$vec/params.json" expect_exit)"
+  output_override="$(vec_field "$vec/params.json" output)"
+  [[ -z "$expect_exit" ]] && expect_exit=0
+  case "$output_override" in
+    base) out="$work/input/base" ;;
+    patch) out="$work/input/patch" ;;
+    input) out="$work/input" ;;
+  esac
   expect_no_output="$(vec_field "$vec/params.json" expect_no_output)"
   dry_run="$(vec_field "$vec/params.json" dry_run)"
   [[ "$expect_no_output" == "1" ]] && expect_no_output=true || expect_no_output=false
   [[ "$dry_run" == "1" ]] && dry_run=true || dry_run=false
 
   # input must be read-only for every vector: snapshot it before the run
-  python3 "$ROOT/spec/tools/manifest.py" "$vec/input" --out "$work/input-before.json" >/dev/null || return 1
+  python3 "$ROOT/spec/tools/manifest.py" "$work/input" --out "$work/input-before.json" >/dev/null || return 1
 
   # bash 3.2 (macOS) treats "${empty[@]}" under `set -u` as unbound, so use a plain string
   local dry_args=""
   [[ "$dry_run" == true ]] && dry_args="--dry-run"
 
   case "$impl:$command" in
-    java:backup) ( cd "$work" && java -jar "$JAR" "$vec/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
-    rust:backup) ( cd "$work" && "$RUST_BIN" backup "$vec/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
-    java:merge) ( cd "$work" && java -jar "$JAR" merge "$vec/input/base" "$vec/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
-    rust:merge) ( cd "$work" && "$RUST_BIN" merge "$vec/input/base" "$vec/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    java:backup) ( cd "$work" && java -jar "$JAR" "$work/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    rust:backup) ( cd "$work" && "$RUST_BIN" backup "$work/input" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    java:merge) ( cd "$work" && java -jar "$JAR" merge "$work/input/base" "$work/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
+    rust:merge) ( cd "$work" && "$RUST_BIN" merge "$work/input/base" "$work/input/patch" "$out" $dry_args $args ) >"$log" 2>&1 ;;
     *) echo "::error::unknown impl/command: $impl/$command"; return 1 ;;
   esac
   local rc=$?
-  if [[ $rc -ne 0 ]]; then
-    echo "[FAIL] $impl/$name: exited $rc"
+  if [[ "$rc" != "$expect_exit" ]]; then
+    echo "[FAIL] $impl/$name: exited $rc, expected $expect_exit"
     tail -20 "$log" | sed 's/^/    /'
     KEEP=1
     return 1
   fi
+  if [[ "$expect_exit" != "0" ]]; then
+    # expected failure: the run must not have produced output nor touched the input
+    python3 "$ROOT/spec/tools/manifest.py" "$work/input" --out "$work/input-after.json" >/dev/null || return 1
+    if ! diff -q "$work/input-before.json" "$work/input-after.json" >/dev/null; then
+      echo "[FAIL] $impl/$name: input was modified by a rejected run"
+      return 1
+    fi
+    if [[ "$expect_no_output" == true && -e "$out" ]]; then
+      echo "[FAIL] $impl/$name: expected no output, but $out exists"
+      return 1
+    fi
+    echo "[PASS] $impl/$name (rejected as expected, nothing written)"
+    [[ $KEEP -eq 1 ]] || rm -rf "$work"
+    return 0
+  fi
 
   # input must be untouched by the run (WOS-9.5 / world safety)
-  python3 "$ROOT/spec/tools/manifest.py" "$vec/input" --out "$work/input-after.json" >/dev/null || return 1
+  python3 "$ROOT/spec/tools/manifest.py" "$work/input" --out "$work/input-after.json" >/dev/null || return 1
   if ! diff -q "$work/input-before.json" "$work/input-after.json" >/dev/null; then
     echo "[FAIL] $impl/$name: input directory was modified by the run"
     return 1
+  fi
+
+  if [[ ! -f "$vec/expected/manifest.json" ]]; then
+    echo "[PASS] $impl/$name (no expected output; input unchanged)"
+    [[ $KEEP -eq 1 ]] || rm -rf "$work"
+    return 0
   fi
 
   if [[ "$expect_no_output" == true ]]; then

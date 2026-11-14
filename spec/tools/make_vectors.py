@@ -550,6 +550,388 @@ def vector_world_26_1(force: bool) -> None:
     print(f"generated {name}")
 
 
+
+# ---------------------------------------------------------------- LZ4 + xxHash32
+
+LZ4_XXHASH_SEED = 0x9747B28C
+P1, P2, P3, P4, P5 = 2654435761, 2246822519, 3266489917, 668265263, 374761393
+
+
+def _rotl(x: int, r: int) -> int:
+    return ((x << r) | (x >> (32 - r))) & 0xFFFFFFFF
+
+
+def xxh32(data: bytes, seed: int) -> int:
+    """Reference xxHash32 (matches jpountz XXHashFactory.hash32 used by both implementations)."""
+    n = len(data)
+    i = 0
+    if n >= 16:
+        v1 = (seed + P1 + P2) & 0xFFFFFFFF
+        v2 = (seed + P2) & 0xFFFFFFFF
+        v3 = seed & 0xFFFFFFFF
+        v4 = (seed - P1) & 0xFFFFFFFF
+        while i <= n - 16:
+            for k, v in enumerate((v1, v2, v3, v4)):
+                lane = struct.unpack_from("<I", data, i + 4 * k)[0]
+                v = (v + lane * P2) & 0xFFFFFFFF
+                v = _rotl(v, 13) * P1 & 0xFFFFFFFF
+                if k == 0:
+                    v1 = v
+                elif k == 1:
+                    v2 = v
+                elif k == 2:
+                    v3 = v
+                else:
+                    v4 = v
+            i += 16
+        h = (_rotl(v1, 1) + _rotl(v2, 7) + _rotl(v3, 12) + _rotl(v4, 18)) & 0xFFFFFFFF
+    else:
+        h = (seed + P5) & 0xFFFFFFFF
+    h = (h + n) & 0xFFFFFFFF
+    while i <= n - 4:
+        h = (h + struct.unpack_from("<I", data, i)[0] * P3) & 0xFFFFFFFF
+        h = _rotl(h, 17) * P4 & 0xFFFFFFFF
+        i += 4
+    while i < n:
+        h = (h + data[i] * P5) & 0xFFFFFFFF
+        h = _rotl(h, 11) * P1 & 0xFFFFFFFF
+        i += 1
+    h ^= h >> 15
+    h = h * P2 & 0xFFFFFFFF
+    h ^= h >> 13
+    h = h * P3 & 0xFFFFFFFF
+    h ^= h >> 16
+    return h
+
+
+def lz4_raw_block(raw: bytes) -> bytes:
+    """A single LZ4 chunk block stored uncompressed (token 0x10), with the MC checksum."""
+    checksum = xxh32(raw, LZ4_XXHASH_SEED) & 0x0FFFFFFF
+    return (
+        b"LZ4Block"
+        + bytes([0x10])
+        + struct.pack("<i", len(raw))
+        + struct.pack("<i", len(raw))
+        + struct.pack("<I", checksum)
+        + raw
+    )
+
+
+METHOD_GZIP = 1
+METHOD_LZ4 = 4
+METHOD_RAW = 3
+
+
+def data_for(method: int, inhabited) -> bytes:
+    raw = chunk_nbt(inhabited)
+    if method == METHOD_ZLIB:
+        return zlib_data(raw)
+    if method == METHOD_GZIP:
+        return gzip.compress(raw, mtime=0)
+    if method == METHOD_RAW:
+        return raw
+    if method == METHOD_LZ4:
+        return lz4_raw_block(raw)
+    if method == METHOD_EXT_ZLIB:
+        return b""
+    raise ValueError(method)
+
+
+def entries_mixed(spec: dict, mtime_base: int) -> list[dict]:
+    """slot -> (inhabited, method) with the payload encoded per method."""
+    return [
+        {"index": slot, "method": method, "data": data_for(method, inhabited), "mtime": mtime_base + slot}
+        for slot, (inhabited, method) in sorted(spec.items())
+    ]
+
+
+# ---------------------------------------------------------------- vector 8
+
+
+def vector_compression(force: bool) -> None:
+    """WOS-2.4/6.1: RAW/GZIP/ZLIB/LZ4 are all readable and payloads are copied verbatim."""
+    name = "compression-matrix"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    spec = {
+        0: (7_000, METHOD_RAW),
+        1: (7_000, METHOD_GZIP),
+        2: (7_000, METHOD_ZLIB),
+        3: (7_000, METHOD_LZ4),
+        4: (0, METHOD_ZLIB),  # below threshold -> removed
+    }
+    entries = entries_mixed(spec, 1_650_000_000)
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "compression-matrix", "command": "backup",
+             "clauses": ["WOS-2.4", "WOS-6.1"], "args": ["--inhabited-time-seconds", "300"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(entries, [0, 1, 2, 3])},
+        {"path": "level.dat", "sha256": mca.sha256(b"level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-2.4（压缩方法码表 RAW=3/GZIP=1/ZLIB=2/LZ4=4）、WOS-6.1（payload 原字节透传）", "",
+        "## 输入", "",
+        "- 槽位 0 RAW、1 GZIP、2 ZLIB、3 LZ4（单个 `LZ4Block`，token `0x10` 未压缩块 + xxHash 校验）",
+        "  的 `InhabitedTime` 均为 7000；槽位 4 为 ZLIB 且 `InhabitedTime=0`",
+        "- 所有 chunk 的 NBT 内容相同（仅压缩方式不同）", "",
+        "## 期望", "",
+        "- 保留槽位 {0,1,2,3}，删除槽位 4",
+        "- 保留槽位的 **payload 必须与输入逐字节一致**（不得重压缩/重编码）",
+        "- 这一条同时验证：读得懂四种压缩（否则 7000 读不到 → 被误删）；不重编码（否则哈希变化）", "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
+# ---------------------------------------------------------------- vector 9
+
+
+def vector_threshold_zero(force: bool) -> None:
+    """WOS-3.2: `-t 0` removes only never-ticked chunks (strictly greater than 0)."""
+    name = "threshold-zero"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    spec = {0: (0, METHOD_ZLIB), 1: (1, METHOD_ZLIB), 2: (0, METHOD_ZLIB)}
+    entries = entries_mixed(spec, 1_650_000_000)
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "threshold-zero", "command": "backup",
+             "clauses": ["WOS-3.2"], "args": ["--inhabited-time-seconds", "0"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(entries, [1])},
+        {"path": "level.dat", "sha256": mca.sha256(b"level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-3.2（严格 `>`；`threshold = 0` 只移除 `InhabitedTime == 0` 的区块）", "",
+        "## 输入", "",
+        "- 槽位 0：`InhabitedTime=0`、槽位 1：`=1`、槽位 2：`=0`",
+        "- 参数：`--inhabited-time-seconds 0`", "",
+        "## 期望", "",
+        "- 只保留槽位 {1}；槽位 0 与 2 被删除（0 不大于 0）", "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
+# ---------------------------------------------------------------- vector 10
+
+
+def vector_remove_unknown(force: bool) -> None:
+    """WOS-5.2/5.3: `--remove-unknown` drops external chunks, normal chunks unaffected."""
+    name = "remove-unknown"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    spec = {
+        0: (0, METHOD_ZLIB),  # removed by threshold
+        1: (None, METHOD_EXT_ZLIB),  # external -> removed because --remove-unknown
+        2: (7_000, METHOD_ZLIB),  # kept
+    }
+    entries = entries_mixed(spec, 1_650_000_000)
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "remove-unknown", "command": "backup",
+             "clauses": ["WOS-5.2", "WOS-5.3"],
+             "args": ["--inhabited-time-seconds", "300", "--remove-unknown"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(entries, [2])},
+        {"path": "level.dat", "sha256": mca.sha256(b"level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-5.2（`removeUnknown` 只影响未知/外部区块）、WOS-5.3（外部存储按开关处置）", "",
+        "## 输入", "",
+        "- 槽位 0 ZLIB `InhabitedTime=0`、槽位 1 外部存储（method `-126`，无内联数据）、",
+        "  槽位 2 ZLIB `InhabitedTime=7000`",
+        "- 参数：`--inhabited-time-seconds 300 --remove-unknown`", "",
+        "## 期望", "",
+        "- 只保留槽位 {2}：槽位 0 被阈值删除，槽位 1 因 `--remove-unknown` 被删除",
+        "- 对照：`decision-inhabited` 向量证明**不带**该开关时外部区块必须保留", "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
+
+# ---------------------------------------------------------------- vector 11
+
+
+def vector_merge_parallel(force: bool) -> None:
+    """WOS-8.8: merge output is byte-identical at `--parallelism 4`."""
+    name = "merge-parallel"
+    src = VECTORS / "merge-basic"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+    if not src.exists():
+        print(f"skip {name} (requires {src.name}; run the full generator)")
+        return
+    shutil.copytree(src / "input", dst / "input")
+    (dst / "expected").mkdir(parents=True, exist_ok=True)
+    expected = json.loads((src / "expected" / "manifest.json").read_text(encoding="utf-8"))
+    expected["vector"] = name
+    (dst / "expected" / "manifest.json").write_text(
+        json.dumps(expected, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "merge-parallel", "command": "merge",
+             "clauses": ["WOS-8.8"], "args": ["--parallelism", "4"]},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    (dst / "README.md").write_text(
+        "\n".join([
+            f"# {name}", "",
+            "覆盖条款：WOS-8.8（并行度不得影响输出字节）", "",
+            "## 输入", "",
+            "- 与 `merge-basic` 完全相同的 base/patch",
+            "- 参数：`--parallelism 4`", "",
+            "## 期望", "",
+            "- 输出清单必须与 `merge-basic` 完全一致（同一份期望清单，逐槽位 payload/时间戳相同）",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    print(f"generated {name}")
+
+
+# ---------------------------------------------------------------- vector 12
+
+
+def vector_merge_corrupt_patch(force: bool) -> None:
+    """WOS-8.6: an unreadable patch region falls back to the base file byte-for-byte."""
+    name = "merge-corrupt-patch"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    base_region = entries_from({0: (0, METHOD_ZLIB), 1: (0, METHOD_ZLIB)}, 1_600_000_000)
+    base_entities = entries_from({0: (0, METHOD_ZLIB)}, 1_600_000_000)
+    write_mca(dst / "input" / "base" / "region" / "r.0.0.mca", base_region)
+    write_mca(dst / "input" / "base" / "entities" / "r.0.0.mca", base_entities)
+    (dst / "input" / "base" / "level.dat").write_bytes(b"base-level")
+
+    corrupt = b"\x00" * 48 + b"corrupt-patch-region"
+    patch_dir = dst / "input" / "patch" / "region"
+    patch_dir.mkdir(parents=True, exist_ok=True)
+    (patch_dir / "r.0.0.mca").write_bytes(corrupt)
+    (dst / "input" / "patch" / "level.dat").write_bytes(b"patch-level")
+
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "merge-corrupt-patch", "command": "merge",
+             "clauses": ["WOS-8.6"], "args": []},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    files = [
+        {"path": "region/r.0.0.mca", "slots": slots_manifest(base_region, [0, 1])},
+        {"path": "entities/r.0.0.mca", "slots": slots_manifest(base_entities, [0])},
+        {"path": "level.dat", "sha256": mca.sha256(b"patch-level")},
+    ]
+    readme = [
+        f"# {name}", "",
+        "覆盖条款：WOS-8.6（patch 无法读取时整文件回退 base）", "",
+        "## 输入", "",
+        "- `base/region/r.0.0.mca` 槽位 {0,1}、`base/entities/r.0.0.mca` 槽位 {0}",
+        "- `patch/region/r.0.0.mca` 为损坏文件（< 8 KiB）；`patch/level.dat` 正常（较新）", "",
+        "## 期望", "",
+        "- patch 不可读时按 WOS-8.6 回退 base：输出 `region/r.0.0.mca` 的槽位即 base 的 {0,1}",
+        "  （payload 与时间戳取自 base 文件，`entities` 同理）；`level.dat` 仍取 patch 版本",
+        "- 若实现改成保留损坏的 patch 文件，本向量会红（与 WOS-8.6 冲突，应改规范而不是改向量）",
+        "",
+    ]
+    write_expected(dst, name, files, readme)
+    print(f"generated {name}")
+
+
+# ---------------------------------------------------------------- vector 13
+
+
+def vector_overlap(force: bool) -> None:
+    """WOS-10.1/8.1: overlapping input/output is rejected before any write."""
+    name = "overlap-rejected"
+    dst = VECTORS / name
+    if dst.exists():
+        if not force:
+            print(f"skip {name} (exists; use --force)")
+            return
+        shutil.rmtree(dst)
+
+    entries = entries_from({0: (7_000, METHOD_ZLIB)}, 1_650_000_000)
+    write_mca(dst / "input" / "region" / "r.0.0.mca", entries)
+    (dst / "input" / "level.dat").write_bytes(b"level")
+    (dst / "params.json").write_text(
+        json.dumps(
+            {"vector": name, "title": "overlap-rejected", "command": "backup",
+             "clauses": ["WOS-10.1"], "args": ["--inhabited-time-seconds", "300", "--strict"],
+             "output": "input", "expect_exit": 1},
+            indent=2,
+        ) + "\n",
+        encoding="utf-8",
+    )
+    (dst / "README.md").write_text(
+        "\n".join([
+            f"# {name}", "",
+            "覆盖条款：WOS-10.1（输入与输出重叠必须被拒绝）、WOS-8.1（merge 同理）", "",
+            "## 输入与参数", "",
+            "- `input/` 最小世界；**OUTPUT 直接指向 INPUT 本身**",
+            "- 参数：`--inhabited-time-seconds 300 --strict`（strict 下拒绝即退出码 1）", "",
+            "## 期望", "",
+            "- 退出码 1（在写入前拒绝）",
+            "- 输入目录清单在运行前后完全一致（不得被 `--force` 清空）",
+            "- 无期望清单：本向量只断言「拒绝 + 不动源数据」",
+            "",
+        ]),
+        encoding="utf-8",
+    )
+    print(f"generated {name}")
+
+
 # ---------------------------------------------------------------- shared
 
 
@@ -640,6 +1022,22 @@ def main() -> int:
     vector_cli_dryrun(args.force)
     vector_errors(args.force)
     vector_world_26_1(args.force)
+    vector_compression(args.force)
+    vector_threshold_zero(args.force)
+    vector_remove_unknown(args.force)
+    # Every real-world vector implicitly verifies the structural clauses below (it reads a
+    # genuine .mca, copies payloads verbatim and preserves per-slot timestamps).
+    structural = ["WOS-1.1", "WOS-1.2", "WOS-2.1", "WOS-2.2", "WOS-2.3", "WOS-6.2", "WOS-6.3"]
+    for params in sorted(VECTORS.glob("*/params.json")):
+        data = json.loads(params.read_text(encoding="utf-8"))
+        if data.get("vector") in ("cli-dry-run", "overlap-rejected"):
+            continue
+        data["clauses"] = sorted(set(data.get("clauses", [])) | set(structural))
+        params.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+
+    vector_merge_parallel(args.force)
+    vector_merge_corrupt_patch(args.force)
+    vector_overlap(args.force)
     return 0
 
 

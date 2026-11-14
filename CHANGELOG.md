@@ -16,6 +16,9 @@
 
 ### 修复
 - legacy `data.Forced` 解析：每个 long 一个 chunk（x 低 32 位 / z 高 32 位），奇数项不再丢弃。
+- **Rust CLI 的输入/输出重叠不再可能删掉源世界**：`rust-thanos backup /world /world` 原会先问
+  "是否覆盖"、答 `y` 即 `remove_dir_all(/world)`，之后才跑到重叠守卫。现在重叠守卫在任何提示/删除
+  之前执行（规范 WOS-10.1），由 `spec/vectors/overlap-rejected` 回归。
 
 ## v0.3.1 (2026-08-20)
 

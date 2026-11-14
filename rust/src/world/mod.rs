@@ -34,6 +34,7 @@ pub use optimizer::{
     optimize, DefaultOptimizer, FilterOptions, Hooks, IoOptions, OptimizerEngine, OptimizerRequest,
     OptimizerRequestBuilder, OutputOptions, ProgressMode, ProgressOptions, RuntimeOptions,
 };
+pub use output::ensure_no_overlap;
 pub use progress::{
     NoopProgressSink, ProgressEvent, ProgressSink, ProgressStage, ProgressTracker, TermProgressSink,
 };

@@ -127,7 +127,10 @@
 
 ## 10. 安全（WOS-10）
 
-- **WOS-10.1** 输入与输出重叠（相同/嵌套/符号链接别名）`MUST` 在任何写入之前被拒绝。
+- **WOS-10.1** 输入与输出重叠（相同/嵌套/符号链接别名）`MUST` 在任何写入之前被拒绝，并且
+  `MUST` 早于**任何交互提示与目录删除**（`--force` / "覆盖吗？" 都不得发生）。
+  `conformance: overlap-rejected`
+  `impl:` java `world/OverlapGuard.kt`（run 内最先执行）/ rust `world/output.rs` + `main.rs`（CLI 入口先守卫）
 - **WOS-10.2** 解压后数据量 `MUST` 有上限（当前 64 MiB/ chunk），超限走安全保留 + 记错误。
 - **WOS-10.3** 输出目录的删除（`--force`）`MUST NOT` 跟随符号链接。
 
@@ -163,6 +166,27 @@
 | `vectors/merge-basic/` | WOS-8.2/8.3/8.4/8.5/8.7 | ✅ 已落地 |
 | `vectors/errors-corrupt-region/` | WOS-6.7（原样保留损坏 region）、WOS-9.3/9.4 | ✅ 已落地 |
 | `vectors/cli-dry-run/` | WOS-9.5 | ✅ 已落地 |
+| `vectors/compression-matrix/` | WOS-2.4、WOS-6.1（原字节透传） | ✅ 已落地 |
+| `vectors/threshold-zero/` | WOS-3.2（`-t 0` 边界） | ✅ 已落地 |
+| `vectors/remove-unknown/` | WOS-5.2/5.3 | ✅ 已落地 |
+| `vectors/merge-parallel/` | WOS-8.8（并行不影响字节） | ✅ 已落地 |
+| `vectors/merge-corrupt-patch/` | WOS-8.6（回退 base） | ✅ 已落地 |
+| `vectors/overlap-rejected/` | WOS-10.1 | ✅ 已落地 |
+
+## 条款覆盖（机器生成）
+
+```bash
+python3 spec/tools/coverage.py            # 条款 ↔ 向量 矩阵（report-only）
+python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未来可接 CI）
+```
+
+当前：**53 条条款，36 条被向量覆盖**。未覆盖的 17 条分三类：
+
+| 类别 | 条款 | 说明 |
+|---|---|---|
+| 待补向量 | WOS-2.5/2.6（外部存储 `.mcc`、`CUSTOM` 压缩）、WOS-3.4（tag 读取歧义）、WOS-4.4（强制加载解析失败）、WOS-5.1/5.4（模式组合/注入）、WOS-6.6（单 chunk 损坏）、WOS-7.5（符号链接）、WOS-9.1/9.2（报告字段语义）、WOS-10.2/10.3（解压上限/删除不跟链接） | 需要专门构造的夹具，列入 S3 后续 |
+| 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现，不是行为断言 |
+| 结构性 | WOS-8.1（merge 重叠） | 与 WOS-10.1 同源，`overlap-rejected` 已覆盖 backup 侧；merge 侧可复用同一向量扩展 |
 
 ## 变更流程
 
