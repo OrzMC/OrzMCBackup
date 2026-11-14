@@ -8,6 +8,15 @@ on:
   # 对应父仓库 AGENTS「发版前必跑 dry-run」。
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'build-only = 构建 6 平台产物（不发布）；homebrew = 只回填/修复 formula'
+        type: choice
+        options: [build-only, homebrew]
+        default: build-only
+      tag:
+        description: 'homebrew 模式的目标 tag（如 rust-v0.0.4）；push 时忽略'
+        required: false
+        type: string
       version:
         description: '版本号（留空则用 rust/Cargo.toml 的 version）'
         required: false
@@ -27,6 +36,7 @@ jobs:
   # Fail fast if the release tag doesn't match the Cargo.toml version, so the
   # published binary's `--version` always agrees with the release tag.
   validate-version:
+    if: github.event_name == 'push' || inputs.mode != 'homebrew'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,6 +65,7 @@ jobs:
 
   build:
     needs: validate-version
+    if: github.event_name == 'push' || inputs.mode != 'homebrew'
     name: build (${{ matrix.target }})
     defaults:
       run:
@@ -226,7 +237,16 @@ jobs:
 
   update-homebrew-tap:
     needs: publish-release
+    # Tag push → normal release path; workflow_dispatch with mode=homebrew → backfill/repair the
+    # formula for an already published tag (no rebuild, no re-publish).
+    if: |
+      always() && (
+        github.event_name == 'push' ||
+        (github.event_name == 'workflow_dispatch' && inputs.mode == 'homebrew')
+      )
     runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
     steps:
       - name: Check tap credentials
         id: guard
@@ -267,32 +287,23 @@ jobs:
           pname="${{ steps.product_main.outputs.product_name }}"
           class=$(echo "$pname" | awk -F'[-_]' '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) tolower(substr($i,2))}}')
           echo "formula_class=$class" >> "$GITHUB_OUTPUT"
-      - name: Determine binary list (formula)
-        if: steps.guard.outputs.skip != 'true'
-        id: bins
-        run: |
-          cd main/rust
-          bins=$(cargo build --release --message-format=json \
-            | grep -E '"reason":"compiler-artifact"' \
-            | grep -E '"executable"' \
-            | sed -E 's/.*"executable":"([^\"]+)".*/\1/' \
-            | xargs -n1 basename \
-            | tr '\n' ' ')
-          if [ -z "$bins" ]; then echo "No executable artifacts found for formula generation. Ensure binaries build on Linux for Homebrew test." >&2; exit 1; fi
-          echo "bins=$bins" >> "$GITHUB_OUTPUT"
+      # (Formerly a "Determine binary list" step ran a full `cargo build` here, but the template
+      # only needs the product name for `bin.install`; dropping it takes ~1-2 min off every release
+      # and makes `mode=homebrew` backfills fast.)
       - name: Prepare URLs
         if: steps.guard.outputs.skip != 'true'
         id: prep
         run: |
           {
-            ver="${GITHUB_REF_NAME#rust-v}"
-            if [ "$ver" = "$GITHUB_REF_NAME" ]; then
-              ver=$(cd main/rust && grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+            if [ -z "${TAG:-}" ]; then
+              echo "::error::TAG is empty (pass inputs.tag when using mode=homebrew)"; exit 1
             fi
-            echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-apple-darwin.tar.gz"
-            echo "url_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-apple-darwin.tar.gz"
-            echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-unknown-linux-gnu.tar.gz"
-            echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-unknown-linux-gnu.tar.gz"
+            ver="${TAG#rust-v}"
+            echo "version=$ver" >> "$GITHUB_OUTPUT"
+            echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/$TAG/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-apple-darwin.tar.gz"
+            echo "url_x64=https://github.com/${{ github.repository }}/releases/download/$TAG/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-apple-darwin.tar.gz"
+            echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/$TAG/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-unknown-linux-gnu.tar.gz"
+            echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/$TAG/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-unknown-linux-gnu.tar.gz"
           } >> "$GITHUB_OUTPUT"
       - name: Verify Tap Repo variable
         if: steps.guard.outputs.skip != 'true'
@@ -328,7 +339,7 @@ jobs:
             -e "s/FORMULA_CLASS/${{ steps.formula.outputs.formula_class }}/" \
             -e "s/FORMULA_DESC/${{ steps.product_main.outputs.product_desc }}/" \
             -e "s|FORMULA_HOME|https://github.com/${{ github.repository }}|" \
-            -e "s/FORMULA_VER/${GITHUB_REF_NAME#rust-v}/" \
+            -e "s/FORMULA_VER/${{ steps.prep.outputs.version }}/" \
             -e "s|URL_ARM|${{ steps.prep.outputs.url_arm64 }}|" \
             -e "s|URL_X64|${{ steps.prep.outputs.url_x64 }}|" \
             -e "s|URL_LINUX_X64|${{ steps.prep.outputs.url_linux_x64 }}|" \
@@ -340,9 +351,13 @@ jobs:
       - name: Commit & push
         if: steps.guard.outputs.skip != 'true'
         run: |
-          cd tap/Formula
+          cd tap
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "::notice::Formula for ${TAG} is already up to date; nothing to commit."
+            exit 0
+          fi
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
-          git add ${{ steps.product_main.outputs.product_name }}.rb
-          git commit -m "${{ steps.product_main.outputs.product_name }} ${{ github.ref_name }}"
+          git add "Formula/${{ steps.product_main.outputs.product_name }}.rb"
+          git commit -m "${{ steps.product_main.outputs.product_name }} ${TAG}"
           git push
