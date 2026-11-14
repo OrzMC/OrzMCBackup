@@ -290,6 +290,35 @@ jobs:
       # (Formerly a "Determine binary list" step ran a full `cargo build` here, but the template
       # only needs the product name for `bin.install`; dropping it takes ~1-2 min off every release
       # and makes `mode=homebrew` backfills fast.)
+      - name: Resolve asset digests
+        id: sha
+        if: steps.guard.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # The sha256 values are taken from the release itself (GitHub asset digest, or a download
+          # as fallback). Doing it here — instead of reusing publish-release outputs — is what makes
+          # `mode=homebrew` backfills work: that job does not run on a manual dispatch.
+          ver="${TAG#rust-v}"
+          name_prefix="${{ steps.product_main.outputs.product_name }}-$ver"
+          for pair in \
+            "sha_arm64:aarch64-apple-darwin" \
+            "sha_x64:x86_64-apple-darwin" \
+            "sha_linux_x64:x86_64-unknown-linux-gnu" \
+            "sha_linux_arm64:aarch64-unknown-linux-gnu"; do
+            key="${pair%%:*}"; target="${pair##*:}"
+            asset="${name_prefix}-${target}.tar.gz"
+            digest=$(gh api "repos/${{ github.repository }}/releases/tags/${TAG}" \
+              --jq ".assets[] | select(.name==\"${asset}\") | .digest" 2>/dev/null || true)
+            if [ -z "$digest" ] || [ "$digest" = "null" ]; then
+              tmp=$(mktemp)
+              curl -fsSL -o "$tmp" "https://github.com/${{ github.repository }}/releases/download/${TAG}/${asset}" \
+                || { echo "::error::cannot download ${asset}"; exit 1; }
+              digest="sha256:$(shasum -a 256 "$tmp" | awk '{print $1}')"
+              rm -f "$tmp"
+            fi
+            echo "${key}=${digest#sha256:}" >> "$GITHUB_OUTPUT"
+          done
       - name: Prepare URLs
         if: steps.guard.outputs.skip != 'true'
         id: prep
@@ -344,14 +373,17 @@ jobs:
             -e "s|URL_X64|${{ steps.prep.outputs.url_x64 }}|" \
             -e "s|URL_LINUX_X64|${{ steps.prep.outputs.url_linux_x64 }}|" \
             -e "s|URL_LINUX_ARM64|${{ steps.prep.outputs.url_linux_arm64 }}|" \
-            -e "s/SHA_ARM/${{ needs.publish-release.outputs.sha_arm64 }}/" \
-            -e "s/SHA_X64/${{ needs.publish-release.outputs.sha_x64 }}/" \
-            -e "s/SHA_LINUX_X64/${{ needs.publish-release.outputs.sha_linux_x64 }}/" \
-            -e "s/SHA_LINUX_ARM64/${{ needs.publish-release.outputs.sha_linux_arm64 }}/" "$out"
+            -e "s/SHA_ARM/${{ steps.sha.outputs.sha_arm64 }}/" \
+            -e "s/SHA_X64/${{ steps.sha.outputs.sha_x64 }}/" \
+            -e "s/SHA_LINUX_X64/${{ steps.sha.outputs.sha_linux_x64 }}/" \
+            -e "s/SHA_LINUX_ARM64/${{ steps.sha.outputs.sha_linux_arm64 }}/" "$out"
       - name: Commit & push
         if: steps.guard.outputs.skip != 'true'
         run: |
           cd tap
+          if grep -q 'sha256 ""' "Formula/${{ steps.product_main.outputs.product_name }}.rb"; then
+            echo "::error::rendered formula contains an empty sha256 — refusing to commit"; exit 1
+          fi
           if [ -z "$(git status --porcelain)" ]; then
             echo "::notice::Formula for ${TAG} is already up to date; nothing to commit."
             exit 0
