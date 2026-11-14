@@ -1,0 +1,268 @@
+name: release-rust
+
+on:
+  push:
+    tags:
+      - 'rust-v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # Fail fast if the release tag doesn't match the Cargo.toml version, so the
+  # published binary's `--version` always agrees with the release tag.
+  validate-version:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: rust
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure tag matches rust/Cargo.toml version
+        run: |
+          ver=$(grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          tag="${GITHUB_REF_NAME#rust-v}"
+          if [ "$ver" != "$tag" ]; then
+            echo "Release tag '${GITHUB_REF_NAME}' does not match rust/Cargo.toml version '$ver' (expected tag rust-v$ver)." >&2
+            exit 1
+          fi
+          echo "OK: tag '${GITHUB_REF_NAME}' matches rust/Cargo.toml version '$ver'"
+
+  build:
+    needs: validate-version
+    name: build (${{ matrix.target }})
+    defaults:
+      run:
+        working-directory: rust
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # macOS：macos-latest 为 arm64 原生，x86_64 走交叉编译
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            exe: ""
+            archive_ext: tar.gz
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            exe: ""
+            archive_ext: tar.gz
+          # Linux：x86_64 原生，aarch64 走交叉编译（需要 gcc-aarch64-linux-gnu）
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            exe: ""
+            archive_ext: tar.gz
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            exe: ""
+            archive_ext: tar.gz
+          # Windows：x86_64 原生，aarch64 交叉编译（windows-latest 已预装 ARM64 MSVC 工具链）
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            exe: .exe
+            archive_ext: zip
+          - target: aarch64-pc-windows-msvc
+            os: windows-latest
+            exe: .exe
+            archive_ext: zip
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine product name
+        id: product
+        shell: bash
+        run: |
+          echo "product_name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Add Rust target
+        run: rustup target add "${{ matrix.target }}"
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install aarch64 Linux linker
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu
+
+      - name: Build
+        run: cargo build --release --locked --target "${{ matrix.target }}"
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          name="${{ steps.product.outputs.product_name }}"
+          exe="${{ matrix.exe }}"
+          bin="target/${{ matrix.target }}/release/${name}${exe}"
+          if [ ! -f "$bin" ]; then
+            echo "Expected binary not found: $bin" >&2
+            exit 1
+          fi
+          mkdir -p dist
+          cp "$bin" "dist/${name}${exe}"
+          cp README.md dist/ || true
+          if [ -f LICENSE ]; then cp LICENSE dist/; fi
+          archive="$name-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_ext }}"
+          if [ "${{ matrix.archive_ext }}" = "zip" ]; then
+            powershell -NoProfile -Command "Compress-Archive -Path 'dist/*' -DestinationPath '$archive' -Force"
+          else
+            tar -C dist -czf "$archive" .
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tarball-${{ matrix.target }}
+          path: rust/${{ steps.product.outputs.product_name }}-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_ext }}
+
+  publish-release:
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      sha_arm64: ${{ steps.compute-sha.outputs.sha_arm64 }}
+      sha_x64: ${{ steps.compute-sha.outputs.sha_x64 }}
+      sha_linux_x64: ${{ steps.compute-sha.outputs.sha_linux_x64 }}
+      sha_linux_arm64: ${{ steps.compute-sha.outputs.sha_linux_arm64 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Determine product name
+        id: product
+        run: |
+          echo "product_name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')" >> "$GITHUB_OUTPUT"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: tarball-*
+          merge-multiple: true
+          path: dist
+
+      - name: Compute SHA256 values
+        id: compute-sha
+        run: |
+          name="${{ steps.product.outputs.product_name }}"
+          tag="${{ github.ref_name }}"
+          cd dist
+          {
+            echo "sha_arm64=$(sha256sum "$name-$tag-aarch64-apple-darwin.tar.gz" | cut -d ' ' -f1)"
+            echo "sha_x64=$(sha256sum "$name-$tag-x86_64-apple-darwin.tar.gz" | cut -d ' ' -f1)"
+            echo "sha_linux_x64=$(sha256sum "$name-$tag-x86_64-unknown-linux-gnu.tar.gz" | cut -d ' ' -f1)"
+            echo "sha_linux_arm64=$(sha256sum "$name-$tag-aarch64-unknown-linux-gnu.tar.gz" | cut -d ' ' -f1)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v3
+        with:
+          files: dist/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  update-homebrew-tap:
+    needs: publish-release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          path: main
+      - name: Set up Rust toolchain (for formula bins)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+      - name: Determine product name
+        id: product_main
+        run: |
+          cd main/rust
+          name=$(grep -E '^name\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          desc=$(grep -E '^description\s*=\s*"' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "product_name=$name" >> "$GITHUB_OUTPUT"
+          echo "product_desc=${desc:-$name}" >> "$GITHUB_OUTPUT"
+      - name: Build formula metadata
+        id: formula
+        run: |
+          pname="${{ steps.product_main.outputs.product_name }}"
+          class=$(echo "$pname" | awk -F'[-_]' '{for(i=1;i<=NF;i++){printf toupper(substr($i,1,1)) tolower(substr($i,2))}}')
+          echo "formula_class=$class" >> "$GITHUB_OUTPUT"
+      - name: Determine binary list (formula)
+        id: bins
+        run: |
+          cd main/rust
+          bins=$(cargo build --release --message-format=json \
+            | grep -E '"reason":"compiler-artifact"' \
+            | grep -E '"executable"' \
+            | sed -E 's/.*"executable":"([^\"]+)".*/\1/' \
+            | xargs -n1 basename \
+            | tr '\n' ' ')
+          if [ -z "$bins" ]; then echo "No executable artifacts found for formula generation. Ensure binaries build on Linux for Homebrew test." >&2; exit 1; fi
+          echo "bins=$bins" >> "$GITHUB_OUTPUT"
+      - name: Prepare URLs
+        id: prep
+        run: |
+          {
+            echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz"
+            echo "url_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz"
+            echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz"
+            echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-aarch64-unknown-linux-gnu.tar.gz"
+          } >> "$GITHUB_OUTPUT"
+      - name: Verify Tap Repo variable
+        id: tap
+        run: |
+          if [ -z "${{ secrets.HOMEBREW_TAP_REPO }}" ]; then
+            echo "HOMEBREW_TAP_REPO secret is not set. Please add it in Repository Settings → Secrets and variables → Actions." >&2
+            exit 1
+          fi
+          echo "repo=${{ secrets.HOMEBREW_TAP_REPO }}" >> "$GITHUB_OUTPUT"
+      - name: Verify Tap Repo token
+        run: |
+          if [ -z "${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}" ]; then
+            echo "HOMEBREW_TAP_REPO_TOKEN secret is not set. Please add it in Repository Settings → Secrets and variables → Actions." >&2
+            exit 1
+          fi
+      - name: Checkout tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.tap.outputs.repo }}
+          token: ${{ secrets.HOMEBREW_TAP_REPO_TOKEN }}
+          path: tap
+      - name: Render formula
+        run: |
+          tpl="main/.github/homebrew_formula.rb.tpl"
+          out="tap/Formula/${{ steps.product_main.outputs.product_name }}.rb"
+          cp "$tpl" "$out"
+          sed -i.bak -e "s|FORMULA_INSTALLS|bin.install \"${{ steps.product_main.outputs.product_name }}\"|" "$out"
+          sed -i.bak \
+            -e "s/FORMULA_CLASS/${{ steps.formula.outputs.formula_class }}/" \
+            -e "s/FORMULA_DESC/${{ steps.product_main.outputs.product_desc }}/" \
+            -e "s|FORMULA_HOME|https://github.com/${{ github.repository }}|" \
+            -e "s/FORMULA_VER/${GITHUB_REF_NAME#rust-v}/" \
+            -e "s|URL_ARM|${{ steps.prep.outputs.url_arm64 }}|" \
+            -e "s|URL_X64|${{ steps.prep.outputs.url_x64 }}|" \
+            -e "s|URL_LINUX_X64|${{ steps.prep.outputs.url_linux_x64 }}|" \
+            -e "s|URL_LINUX_ARM64|${{ steps.prep.outputs.url_linux_arm64 }}|" \
+            -e "s/SHA_ARM/${{ needs.publish-release.outputs.sha_arm64 }}/" \
+            -e "s/SHA_X64/${{ needs.publish-release.outputs.sha_x64 }}/" \
+            -e "s/SHA_LINUX_X64/${{ needs.publish-release.outputs.sha_linux_x64 }}/" \
+            -e "s/SHA_LINUX_ARM64/${{ needs.publish-release.outputs.sha_linux_arm64 }}/" "$out"
+      - name: Commit & push
+        run: |
+          cd tap/Formula
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add ${{ steps.product_main.outputs.product_name }}.rb
+          git commit -m "${{ steps.product_main.outputs.product_name }} ${{ github.ref_name }}"
+          git push

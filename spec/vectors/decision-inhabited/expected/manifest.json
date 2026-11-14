@@ -1,0 +1,30 @@
+{
+  "files": [
+    {
+      "path": "level.dat",
+      "sha256": "82884144390539e6a0d85ff217acb86f6ca4d81a8e8df7c0336ffc798b739b9b"
+    },
+    {
+      "path": "region/r.0.0.mca",
+      "slots": [
+        {
+          "index": 3,
+          "modified_time": 1700000003,
+          "payload_sha256": "8603a34027232c28254a86d56a253098a148bfc4677c5e7822c48e9e332df9c1"
+        },
+        {
+          "index": 4,
+          "modified_time": 1700000004,
+          "payload_sha256": "2e9a20537ec8cf2298d7d5eff7e87bb5ae2e6de0002dd350ceaead5eb5336399"
+        },
+        {
+          "index": 5,
+          "modified_time": 1700000005,
+          "payload_sha256": "95a56fdcf5960da1643f672da8755691b9019f736cfd78190349cf33e9809296"
+        }
+      ]
+    }
+  ],
+  "spec_version": "1.0",
+  "vector": "decision-inhabited"
+}

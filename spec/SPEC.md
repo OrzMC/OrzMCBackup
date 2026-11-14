@@ -1,6 +1,6 @@
 # OrzMCBackup 行为规范（WOS）
 
-> **状态**：v0.1（冻结当前三份实现的可观察行为；条款文本先落地，向量的完整化见 §4 进度表）
+> **状态**：v0.2（条款已落地；`forceload-forced` / `decision-inhabited` 两个向量已生效并通过 java+rust，其余向量见末尾进度表）
 > **规范性**：本文是**唯一行为真值**。`java/`、`rust/` 的实现必须满足本文件条款；允许的分歧只能登记在
 > [`divergences.md`](divergences.md)，与官方 PHP 的对照见 [`upstream-divergences.md`](upstream-divergences.md)。
 > **关键词**：`MUST`（必须）/ `MUST NOT`（禁止）/ `SHOULD`（应当）/ `MAY`（可以），按 RFC 2119 解释。
@@ -136,8 +136,9 @@
 - **WOS-12.1** 一致性以「**manifest 等价**」判定（见 `schema/manifest.schema.json`）：
   严格比较**文件集合**、每个 `.mca` 的**槽位占用集合**、每个槽位的 **payload SHA-256 与时间戳**、
   杂项文件 SHA-256、报告计数与错误 `kind` 集合；忽略 §11 项。
-- **WOS-12.2** 期望清单 `MUST` 由独立参考实现（`tools/make_manifest.py`）生成并经人工评审，
-  `MUST NOT` 由任一被测实现的输出直接充当期望值。
+- **WOS-12.2** 期望清单 `MUST` 依据条款手工推导（`tools/make_vectors.py`，含逐条推导说明与
+  provenance），`MUST NOT` 由任一被测实现的输出直接充当期望值；实际清单由中立读取器
+  `tools/manifest.py` 从输出目录派生（实现不产 manifest）。比较由 `tools/compare.py` 完成。
 - **WOS-12.3** 向量以仓库内 `spec/vectors/<name>/{params.json,input/,expected/manifest.json}` 组织，
   `MUST` 可通过 `scripts/conformance.sh` 复现。
 - **WOS-12.4** conformance 失败 `MUST` 阻断合并（CI 门禁）。
@@ -148,13 +149,13 @@
 
 | 向量目录 | 覆盖条款 | 状态 |
 |---|---|---|
-| `vectors/forceload/` | WOS-4.1/4.2/4.3/4.5 | 待补（S3） |
-| `vectors/decision/` | WOS-3.1–3.4、WOS-5.1–5.3 | 待补（S3） |
-| `vectors/world-basic/` | WOS-2、WOS-6、WOS-7 | 待补（S3） |
-| `vectors/world-26-1/` | WOS-7.1/7.2 | 待补（S3） |
-| `vectors/merge-basic/` | WOS-8 | 待补（S3） |
-| `vectors/errors/` | WOS-2.6、WOS-6.6、WOS-10.2 | 待补（S3） |
-| `vectors/cli/` | WOS-9.4/9.5 | 待补（S3） |
+| `vectors/forceload-forced/` | WOS-4.1/4.2/4.3/4.5 | ✅ 已落地（java+rust PASS；旧的双 long 解析会红） |
+| `vectors/decision-inhabited/` | WOS-3.1/3.2/3.3、WOS-5.3 | ✅ 已落地（严格 `>`、缺 tag、外部压缩） |
+| `vectors/world-basic/` | WOS-2、WOS-6、WOS-7 | 待补（S3 第二批） |
+| `vectors/world-26-1/` | WOS-7.1/7.2 | 待补（S3 第二批） |
+| `vectors/merge-basic/` | WOS-8 | 待补（S3 第二批） |
+| `vectors/errors/` | WOS-2.6、WOS-6.6、WOS-10.2 | 待补（S3 第二批） |
+| `vectors/cli/` | WOS-9.4/9.5 | 待补（S3 第二批） |
 
 ## 变更流程
 

@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/OrzMC/OrzMCBackup/main/spec/schema/manifest.schema.json",
+  "title": "OrzMCBackup conformance manifest (WOS-12)",
+  "description": "由中立读取器 spec/tools/manifest.py 从世界目录派生；实现本身不产出该文件。严格比较的文件集合、槽位集合、payload SHA-256 与时间戳即一致性判据。",
+  "type": "object",
+  "required": ["spec_version", "files"],
+  "additionalProperties": false,
+  "properties": {
+    "spec_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "vector": { "type": "string" },
+    "files": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "description": "region/ 下的 .mca：按槽位比较（内容 + 时间戳），忽略扇区布局",
+            "required": ["path", "slots"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string", "pattern": "(^|/)region/[^/]+\\.mca$" },
+              "slots": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["index", "payload_sha256", "modified_time"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "index": { "type": "integer", "minimum": 0, "maximum": 1023 },
+                    "payload_sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                    "modified_time": { "type": "integer" }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "description": "其余文件（含 entities/poi 的 .mca、level.dat、.mcc 等）：整文件 SHA-256",
+            "required": ["path", "sha256"],
+            "additionalProperties": false,
+            "properties": {
+              "path": { "type": "string" },
+              "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

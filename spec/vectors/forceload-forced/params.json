@@ -1,0 +1,15 @@
+{
+  "vector": "forceload-forced",
+  "title": "forceload-forced",
+  "clauses": [
+    "WOS-4.1",
+    "WOS-4.2",
+    "WOS-4.3",
+    "WOS-4.5"
+  ],
+  "command": "backup",
+  "args": [
+    "--inhabited-time-seconds",
+    "1000000"
+  ]
+}

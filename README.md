@@ -39,7 +39,7 @@
 
 | 目录 | 内容 |
 |---|---|
-| `spec/` | **语言无关规范**（条款 WOS-###）+ 一致性测试向量 + 中立比较器 —— 唯一行为真值 |
+| `spec/` | **语言无关规范**（条款 WOS-###）+ 一致性测试向量（`vectors/`）+ 中立比较器（`tools/`）—— 唯一行为真值 |
 | `java/` | Kotlin/JVM 实现：`core`（Maven Central 库）+ `app`（CLI Shadow JAR） |
 | `rust/` | Rust 实现：Cargo crate，CLI + lib |
 | `upstream/thanos/` | 官方 PHP `aternosorg/thanos`（submodule，**只读参考**，不参与构建） |

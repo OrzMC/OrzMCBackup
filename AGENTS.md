@@ -75,6 +75,14 @@ java/gradlew -p java :core:portalBundle --no-daemon -Pversion=X.Y.Z \
 java/gradlew -p java :core:printTestPaths --no-daemon
 ```
 
+跨域一致性（**CI 阻断门禁**，改动 spec/java/rust 都要跑）：
+
+```bash
+./scripts/conformance.sh all      # 构建 java+rust，跑 spec/vectors 全部向量并做中立比对
+./scripts/conformance.sh --no-build java   # 用已有产物只跑某域
+python3 spec/tools/make_vectors.py --force # 重新生成向量（CI 会校验 git diff 为空）
+```
+
 Rust 域（`cd rust` 后执行，或 `--manifest-path rust/Cargo.toml`）：
 
 ```bash
@@ -140,8 +148,10 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 - 覆盖率门槛：core **≥75%**、app **≥50%**（`koverVerify` 已绑定 `check`，`java/gradlew -p java check` 不达标即失败，CI 强制）
 - CI 矩阵：JDK 17/21/25 × Ubuntu/macOS/Windows（`.github/workflows/java.yml`）；lint/coverage 用 JDK 25；
   Rust 域并行跑 fmt/clippy/`cargo check --locked`/test（`.github/workflows/rust.yml`）；
+  跨域一致性门禁 `.github/workflows/conformance.yml`（`scripts/conformance.sh all`，红即阻断合并）；
   发布工作流 `release-java-lib.yml` / `release-java-app.yml`（tag `java-v*`）用 **Temurin 21**，产物目标 Java 17
-- 提交前请确保 `java/gradlew -p java ktlintCheck detekt --no-daemon` 通过
+- 提交前请确保 `java/gradlew -p java ktlintCheck detekt --no-daemon` 与 `./scripts/conformance.sh all` 通过
+- 行为变更流程：**先改 `spec/SPEC.md` 条款（+ 向量）** → 再改 `java/`、`rust/` → 一致性门禁绿
 
 ## 测试模式
 
@@ -159,6 +169,7 @@ Java 域两个模块：`java/core`（库）与 `java/app`（CLI 入口）。`app
 用户文档（中文）：
 - `README.md` — 快速开始、CLI 参考、库用法（**改代码后必须同步**）
 - `spec/SPEC.md` — **语言无关行为规范**（条款 WOS-###，实现必须对齐）
+- `spec/vectors/` — 一致性向量（`input/` + `params.json` + `expected/manifest.json`）；`spec/tools/` 中立读取/比较器
 - `spec/divergences.md` / `spec/upstream-divergences.md` — 允许的分歧 / 与官方 PHP 的对照
 - `rust/README.md` — Rust 域构建、测试与发布
 - `upstream/README.md` — 官方 PHP 子模块的只读使用与升级流程

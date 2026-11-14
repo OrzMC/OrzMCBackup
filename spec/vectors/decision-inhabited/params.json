@@ -1,0 +1,15 @@
+{
+  "vector": "decision-inhabited",
+  "title": "decision-inhabited",
+  "clauses": [
+    "WOS-3.1",
+    "WOS-3.2",
+    "WOS-3.3",
+    "WOS-5.3"
+  ],
+  "command": "backup",
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ]
+}

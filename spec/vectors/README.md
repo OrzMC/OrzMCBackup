@@ -1,0 +1,37 @@
+# 一致性向量
+
+每个向量是一个目录：
+
+```
+<name>/
+├── README.md             # 覆盖条款、输入构造方式、期望值的推导说明
+├── params.json           # {"vector","clauses","command","args":[CLI 参数]}
+├── input/                # 世界目录（实现只读，不得修改）
+└── expected/manifest.json  # 期望清单（按条款手工推导）
+```
+
+## 规则
+
+1. **确定性**：向量由 `spec/tools/make_vectors.py` 生成，不使用当前时间（时间戳全为固定值）。
+   CI 会重新生成并 `git diff --exit-code`，防止手工改动输入却忘记同步期望。
+2. **期望值独立**：`expected/manifest.json` 由生成脚本按条款推导（保留哪些槽位是手工列出的，
+   payload 哈希取自输入字节），**不运行任何实现**。
+3. **实现只读**：运行器把 `input/` 直接传给实现的 CLI，输出到临时目录；实现不得原地修改输入。
+4. **比较口径**：见 `spec/tools/compare.py` 与 `spec/schema/manifest.schema.json`。
+
+## 现有向量
+
+| 向量 | 条款 | 证明什么 |
+|---|---|---|
+| `forceload-forced` | WOS-4.1/4.2/4.3/4.5 | `data.Forced` 是「每 long 一个 chunk，x 低 32 位 / z 高 32 位」；奇数项不丢；非强制区块按阈值删除 |
+| `decision-inhabited` | WOS-3.1/3.2/3.3、WOS-5.3 | 严格 `>`（等于阈值删除）、缺失 `InhabitedTime` 保留、外部压缩默认保留 |
+
+> 反证：`forceload-forced` 的 3 个 packed long 若按旧的「两个 long 拼一个坐标」解释，会得到
+> `(5,1)` 一个坐标并丢掉最后一项 → 保留槽位变成 `{37}`，与期望 `{5,65,650}` 不符，向量必红。
+
+## 追加向量
+
+1. 在 `spec/tools/make_vectors.py` 里新增 `vector_xxx()`（或手工构造 `input/`）；
+2. 按条款推导 `expected/manifest.json` 并在向量 `README.md` 写明推导过程；
+3. 本地跑 `scripts/conformance.sh all`，java 与 rust 都必须 PASS；
+4. 提交时同时带上 `input/`、`params.json`、`expected/`、`README.md`。
