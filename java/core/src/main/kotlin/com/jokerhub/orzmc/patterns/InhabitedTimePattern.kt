@@ -26,9 +26,15 @@ class InhabitedTimePattern(
 ) : ChunkPattern {
     override fun matches(entry: McaEntry): Boolean {
         if (entry.isExternal()) return !removeUnknown
-        val data = entry.allDataUncompressed()
-        if (data.isEmpty()) return !removeUnknown
-        val t = ChunkNbtScanner.findInhabitedTime(data)
-        return t?.let { it > threshold } ?: (!removeUnknown)
+        // Streams the decompressed payload (WOS-10.2): memory stays bounded by the compressed block
+        // size instead of the decompressed size, and we stop reading once the root tag is found.
+        return when (val r = entry.openDataStream().use { ChunkNbtScanner.scan(it) }) {
+            is ChunkNbtScanner.ScanResult.Found -> r.value > threshold
+            is ChunkNbtScanner.ScanResult.Absent -> !removeUnknown
+            // Unparseable chunk: keep it (WOS-6.6); the exception makes the engine record a Pattern error.
+            is ChunkNbtScanner.ScanResult.Malformed -> throw IllegalArgumentException(
+                "malformed chunk NBT: ${r.reason}",
+            )
+        }
     }
 }

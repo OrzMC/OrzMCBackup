@@ -2,7 +2,7 @@ use crate::mca::access::RandomAccess;
 use anyhow::{anyhow, Result};
 use byteorder::{ByteOrder, LittleEndian};
 use flate2::read::{GzDecoder, ZlibDecoder};
-use std::io::Read;
+use std::io::{Cursor, Read};
 use xxhash_rust::xxh32::xxh32;
 
 pub struct McaEntry {
@@ -15,7 +15,7 @@ pub struct McaEntry {
     region_z: i32,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum CompressionMethod {
     Gzip,
     Zlib,
@@ -179,6 +179,32 @@ impl McaEntry {
         }
     }
 
+    /// Streaming view of the decompressed payload (WOS-10.2).
+    ///
+    /// Mirrors the upstream PHP implementation, which reads chunks as a stream and never materialises
+    /// the whole payload: the caller pulls only as far as it needs, and memory is bounded by one LZ4
+    /// block / the compressed payload instead of the decompressed size. Reads past
+    /// [`MAX_UNCOMPRESSED_CHUNK_LENGTH`] fail, so callers keep the "safe keep + reported error" path.
+    pub fn open_data_stream(&mut self) -> Result<Box<dyn Read>> {
+        let (cm, data, _) = self.data_bytes()?;
+        let raw: Box<dyn Read> = match cm {
+            CompressionMethod::Raw => Box::new(Cursor::new(data)),
+            CompressionMethod::Zlib => Box::new(ZlibDecoder::new(Cursor::new(data))),
+            CompressionMethod::Gzip => Box::new(GzDecoder::new(Cursor::new(data))),
+            CompressionMethod::Lz4 => Box::new(Lz4BlockReader::new(data)),
+            other => {
+                return Err(anyhow!(
+                    "unsupported compression method for streaming: {:?}",
+                    other
+                ))
+            }
+        };
+        Ok(Box::new(BoundedReader::new(
+            raw,
+            MAX_UNCOMPRESSED_CHUNK_LENGTH as u64,
+        )))
+    }
+
     pub fn is_external(&mut self) -> Result<bool> {
         let (_, cm, _) = self.read_header()?;
         Ok(matches!(
@@ -261,4 +287,119 @@ pub fn decode_lz4_blocks(inp: &[u8]) -> Result<Vec<u8>> {
         return Err(anyhow!("dangling LZ4 bytes"));
     }
     Ok(out)
+}
+
+/// Fails once `limit` decompressed bytes have been produced.
+struct BoundedReader<R: Read> {
+    inner: R,
+    remaining: u64,
+}
+
+impl<R: Read> BoundedReader<R> {
+    fn new(inner: R, limit: u64) -> Self {
+        Self {
+            inner,
+            remaining: limit,
+        }
+    }
+}
+
+impl<R: Read> Read for BoundedReader<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.remaining == 0 {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "chunk decompressed size exceeds limit",
+            ));
+        }
+        let want = buf.len().min(self.remaining as usize);
+        let n = self.inner.read(&mut buf[..want])?;
+        self.remaining -= n as u64;
+        Ok(n)
+    }
+}
+
+/// Pulls LZ4 chunk blocks one at a time, so the largest allocation is a single block.
+struct Lz4BlockReader {
+    input: Vec<u8>,
+    pos: usize,
+    block: Vec<u8>,
+    block_pos: usize,
+}
+
+impl Lz4BlockReader {
+    fn new(input: Vec<u8>) -> Self {
+        Self {
+            input,
+            pos: 0,
+            block: Vec::new(),
+            block_pos: 0,
+        }
+    }
+
+    fn next_block(&mut self) -> Result<bool> {
+        const HEADER: usize = 8 + 1 + 4 + 4 + 4;
+        if self.pos + HEADER > self.input.len() {
+            return Ok(false);
+        }
+        if &self.input[self.pos..self.pos + 8] != LZ4_MAGIC {
+            return Err(anyhow!("invalid LZ4 magic"));
+        }
+        let method = self.input[self.pos + 8] & 0xF0;
+        let comp_len = LittleEndian::read_u32(&self.input[self.pos + 9..self.pos + 13]) as usize;
+        let decomp_len = LittleEndian::read_u32(&self.input[self.pos + 13..self.pos + 17]) as usize;
+        let checksum = LittleEndian::read_u32(&self.input[self.pos + 17..self.pos + 21]) as i32;
+        let start = self.pos + HEADER;
+        if start + comp_len > self.input.len() {
+            return Err(anyhow!("LZ4 block truncated"));
+        }
+        if decomp_len > MAX_UNCOMPRESSED_CHUNK_LENGTH {
+            return Err(anyhow!("LZ4 block declares oversized decompressed length"));
+        }
+        let decoded = match method {
+            0x10 => self.input[start..start + comp_len].to_vec(),
+            0x20 => {
+                let mut dest = vec![0u8; decomp_len];
+                let n = lz4_flex::block::decompress_into(
+                    &self.input[start..start + comp_len],
+                    &mut dest,
+                )
+                .map_err(|e| anyhow!("LZ4 decompress failed: {}", e))?;
+                debug_assert_eq!(n, decomp_len);
+                dest
+            }
+            _ => return Err(anyhow!("unsupported LZ4 method")),
+        };
+        if lz4_checksum(&decoded) as i32 != checksum {
+            return Err(anyhow!("LZ4 checksum mismatch"));
+        }
+        self.pos = start + comp_len;
+        self.block = decoded;
+        self.block_pos = 0;
+        Ok(true)
+    }
+}
+
+impl Read for Lz4BlockReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+        while self.block_pos >= self.block.len() {
+            match self.next_block() {
+                Ok(true) => {}
+                Ok(false) => return Ok(0),
+                Err(e) => {
+                    return Err(std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        e.to_string(),
+                    ))
+                }
+            }
+        }
+        let n = buf.len().min(self.block.len() - self.block_pos);
+        buf[..n].copy_from_slice(&self.block[self.block_pos..self.block_pos + n]);
+        self.block_pos += n;
+        Ok(n)
+    }
 }

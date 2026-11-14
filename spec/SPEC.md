@@ -140,7 +140,10 @@
   `MUST` 早于**任何交互提示与目录删除**（`--force` / "覆盖吗？" 都不得发生）。
   `conformance: overlap-rejected`
   `impl:` java `world/OverlapGuard.kt`（run 内最先执行）/ rust `world/output.rs` + `main.rs`（CLI 入口先守卫）
-- **WOS-10.2** 解压后数据量 `MUST` 有上限（当前 64 MiB/ chunk），超限走安全保留 + 记错误。
+- **WOS-10.2** 解压后**读取**的数据量 `MUST` 有上限（当前 64 MiB/chunk），超限走安全保留 + 记错误。
+  实现 `SHOULD` 采用**流式**读取（逐块解压、按需前读）：内存应受"压缩块大小"约束而非"解压后大小"，
+  因此上述上限是时间/健壮性护栏，而不是拒绝合法大 chunk 的理由。
+  `conformance: decompress-bomb`（含流式路径）
 - **WOS-10.3** 输出目录的删除（`--force`）`MUST NOT` 跟随符号链接。
 
 ## 11. 实现定义（不参与一致性比较）
@@ -197,6 +200,7 @@
 | `vectors/decompress-bomb/` | WOS-10.2（解压上限安全路径） | ✅ 已落地 |
 | `vectors/inhabited-nested/` | WOS-3.1/3.4（根层与 `Level` 兼容，嵌套同名 tag 忽略） | ✅ 已落地 |
 | `vectors/force-output-symlink/` | WOS-10.3（`--force` 不跟随符号链接删除） | ✅ 已落地 |
+| `vectors/malformed-nbt/` | WOS-6.6（可解压但非合法 NBT → 保留 + 记错误） | ✅ 已落地 |
 
 ## 条款覆盖（机器生成）
 
@@ -205,7 +209,7 @@ python3 spec/tools/coverage.py            # 条款 ↔ 向量 矩阵（report-on
 python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未来可接 CI）
 ```
 
-当前（2026-11-14）：**54 条条款，48 条被向量覆盖（23 个向量）**。未覆盖的 6 条分两类：
+当前（2026-11-14）：**54 条条款，48 条被向量覆盖（24 个向量）**。未覆盖的 6 条分两类：
 
 | 类别 | 条款 | 说明 |
 |---|---|---|
