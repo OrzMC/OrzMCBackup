@@ -20,7 +20,6 @@ lz4_flex = "0.11"
 fastnbt = "2"
 byteorder = "1"
 regex = "1"
-thiserror = "1"
 uuid = { version = "1", features = ["v4"] }
 xxhash-rust = { version = "0.8", features = ["xxh32"] }
 log = "0.4"
