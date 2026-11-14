@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'rust-v*'
+  # 手动 dry-run：只构建/打包并上传 workflow artifacts，不创建 Release、不动 homebrew。
+  # 对应父仓库 AGENTS「发版前必跑 dry-run」。
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（留空则用 rust/Cargo.toml 的 version）'
+        required: false
+        type: string
 
 permissions:
   contents: write
@@ -28,12 +36,22 @@ jobs:
       - name: Ensure tag matches rust/Cargo.toml version
         run: |
           ver=$(grep -E '^version\s*=' Cargo.toml | head -n1 | sed -E 's/.*"([^"]+)".*/\1/')
-          tag="${GITHUB_REF_NAME#rust-v}"
-          if [ "$ver" != "$tag" ]; then
-            echo "Release tag '${GITHUB_REF_NAME}' does not match rust/Cargo.toml version '$ver' (expected tag rust-v$ver)." >&2
-            exit 1
+          if [ "${{ github.event_name }}" = "push" ]; then
+            tag="${GITHUB_REF_NAME#rust-v}"
+            if [ "$ver" != "$tag" ]; then
+              echo "Release tag '${GITHUB_REF_NAME}' does not match rust/Cargo.toml version '$ver' (expected tag rust-v$ver)." >&2
+              exit 1
+            fi
+            echo "OK: tag '${GITHUB_REF_NAME}' matches rust/Cargo.toml version '$ver'"
+          else
+            req="${{ inputs.version }}"
+            req="${req:-$ver}"
+            if [ "$ver" != "$req" ]; then
+              echo "Requested version '$req' does not match rust/Cargo.toml version '$ver'." >&2
+              exit 1
+            fi
+            echo "DRY-RUN: building $ver (nothing will be published)"
           fi
-          echo "OK: tag '${GITHUB_REF_NAME}' matches rust/Cargo.toml version '$ver'"
 
   build:
     needs: validate-version
@@ -132,6 +150,8 @@ jobs:
 
   publish-release:
     needs: build
+    # dry-run (workflow_dispatch) stops after building + uploading workflow artifacts
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     outputs:
       sha_arm64: ${{ steps.compute-sha.outputs.sha_arm64 }}
