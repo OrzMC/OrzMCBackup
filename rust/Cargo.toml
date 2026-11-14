@@ -18,7 +18,7 @@ anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 rayon = "1"
 flate2 = { version = "1", features = ["zlib"] }
-lz4_flex = "0.11"
+lz4_flex = "0.14"
 fastnbt = "2"
 byteorder = "1"
 regex = "1"
@@ -26,8 +26,8 @@ uuid = { version = "1", features = ["v4"] }
 xxhash-rust = { version = "0.8", features = ["xxh32"] }
 log = "0.4"
 env_logger = "0.11"
-indicatif = "0.17"
-console = "0.15"
+indicatif = "0.18"
+console = "0.16"
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 zip = "9"
 
