@@ -65,8 +65,22 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/java-v')
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ env.VERSION }}
+          # The triggering tag is already `java-vX.Y.Z` — do not invent a second one.
           name: OrzMCBackup CLI v${{ env.VERSION }}
+          body: |
+            安装：下载下方 `backup.jar`（`java -jar backup.jar --help`）；库：`io.github.wangzhizhou:backup-core:${{ env.VERSION }}`（Maven Central）。
+
+            ## 升级须知
+            - **无法解析的 region 不再静默消失**：非原地备份时，头部损坏/读取失败的 region 及其
+              `entities`/`poi` 兄弟文件会被**原样复制**到输出，并记录错误。此前该 region 会从备份中缺失。
+            - 自动化脚本建议始终加 `--strict`（非 strict 下即使记录到错误，退出码仍为 0）。
+
+            ## 新增
+            - `merge --dry-run` + `--diff-file`：预览槽位级合并决策并输出 chunk 级回退清单（不写任何文件）。
+            - `RangePattern` 回归 + `FilterOptions.extraPatterns`：库可注入自定义保留模式。
+            - 一致性门禁：`scripts/conformance.sh`（Java/Rust/上游 PHP 三方对齐 24 个向量）。
+
+            完整变更见仓库 `CHANGELOG.md` 的 `v${{ env.VERSION }}` 一节。
           files: |
             java/app/build/libs/backup.jar
             java/app/build/libs/backup.jar.sha256
