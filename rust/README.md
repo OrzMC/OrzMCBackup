@@ -14,7 +14,7 @@
 
 - **智能区块检测**：`InhabitedTime`（严格大于阈值）、强加载区块列表与 `--keep-range` 多通道取并集判定，未知压缩格式默认安全保留
 - **多种压缩格式支持**：兼容 RAW、ZLIB、GZIP、LZ4 Block（含校验）
-- **数据安全**：损坏/无法解析的区块**安全保留**而非删除；损坏区块记录到报告；原地模式跳过打开失败/过小的输入文件，绝不丢数据；解压有 64MB 上限防解压炸弹
+- **数据安全**：损坏/无法解析的区块**安全保留**而非删除；损坏区块记录到报告；原地模式跳过打开失败/过小的输入文件，绝不丢数据；chunk **流式解压**（内存受压缩块大小约束），另设 64 MiB 读取量护栏防解压炸弹
 - **输出即可用世界**：自动复制 `level.dat`、`players/`、`data/`、`.bak` 等非 MCA 文件，输出目录可直接当世界用
 - **merge 合并恢复**：把优化后的世界（patch）按区块槽级合并回完整备份（base），合并结果 = 备份的全量 + 优化后仍存活的最新区块，entities/poi 与区块锁步，无法打开的 patch region 逐字节回退 base
 - **并行处理**：region 级并行（`--parallelism`，默认按 CPU 核数），任意并行度下输出逐字节一致
@@ -24,7 +24,35 @@
 - **便捷归档**：非原地模式支持把输出压缩为 `YYYYMMddHHmmss.zip`
 - **库 + CLI 双形态**：完整配置模型、IO 抽象（`FileSystem` / `McaIOFactory`）、hooks（`on_error` / `report_sink` / `metrics_sink`）、内存文件系统，可作库嵌入
 
-## 📦 安装
+## 📦 安装 / 分发渠道
+
+| 渠道 | 命令 | 适用 |
+|---|---|---|
+| **crates.io**（CLI） | `cargo install rust-thanos` | 有 Rust 工具链，想要一条命令装好 |
+| **crates.io**（库） | `rust-thanos = "0.0"`（Cargo.toml） | 嵌入到自己的 Rust 工具里 |
+| **Homebrew**（macOS/Linux） | `brew tap orzgeeker/core && brew install rust-thanos` | 不想装 Rust 工具链 |
+| **预编译二进制** | 见下文 Releases 页（6 平台） | 无运行时依赖，解压即用 |
+| **源码构建** | `git clone … && cd OrzMCBackup/rust && cargo build --release` | 需要改动代码 / 审计 |
+
+> 版本号只有 `rust/Cargo.toml` 一个事实源；发布 tag 必须是 `rust-v<version>`（CI 会校验）。
+> crates.io 上传前请确认 `cargo package --list` 不含 `tests/Fixtures/**`（已在 `Cargo.toml` 里排除，
+> 否则 34 MB 的真实世界夹具会超过 10 MB 上限）。
+
+### 通过 crates.io 安装
+
+```bash
+cargo install rust-thanos      # 装 CLI 到 ~/.cargo/bin
+```
+
+作为库使用（需要 Rust 2021）：
+
+```toml
+[dependencies]
+rust-thanos = "0.0"
+```
+
+> 注意：本仓库是 monorepo（实现位于 `rust/` 子目录），**Cargo 的 git 依赖不支持子目录**，
+> 所以库分发走 crates.io。需要跟随未发布改动时，用本地 `path` 依赖（`rust-thanos = { path = "../OrzMCBackup/rust" }`）。
 
 ### 通过 Homebrew 安装
 
@@ -51,7 +79,7 @@ cargo install --path .         # 安装到系统（可选）
 
 ### 下载预编译二进制文件
 
-预编译二进制可在 [Releases](https://github.com/OrzMC/rust-thanos/releases) 页面下载，开箱即用（无需安装运行时）：
+预编译二进制可在 [Releases](https://github.com/OrzMC/OrzMCBackup/releases) 页面下载，开箱即用（无需安装运行时）：
 
 | 平台 | 架构 | 产物格式 |
 | --- | --- | --- |

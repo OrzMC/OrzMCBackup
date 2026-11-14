@@ -121,10 +121,13 @@ jobs:
         run: cargo build --release --locked --target "${{ matrix.target }}"
 
       - name: Package
+        id: package
         shell: bash
         run: |
           set -euo pipefail
           name="${{ steps.product.outputs.product_name }}"
+          ver="${GITHUB_REF_NAME#rust-v}"   # asset names use the bare version, not the tag
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
           exe="${{ matrix.exe }}"
           bin="target/${{ matrix.target }}/release/${name}${exe}"
           if [ ! -f "$bin" ]; then
@@ -135,7 +138,7 @@ jobs:
           cp "$bin" "dist/${name}${exe}"
           cp README.md dist/ || true
           if [ -f LICENSE ]; then cp LICENSE dist/; fi
-          archive="$name-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_ext }}"
+          archive="$name-$ver-${{ matrix.target }}.${{ matrix.archive_ext }}"
           if [ "${{ matrix.archive_ext }}" = "zip" ]; then
             powershell -NoProfile -Command "Compress-Archive -Path 'dist/*' -DestinationPath '$archive' -Force"
           else
@@ -146,13 +149,17 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: tarball-${{ matrix.target }}
-          path: rust/${{ steps.product.outputs.product_name }}-${{ github.ref_name }}-${{ matrix.target }}.${{ matrix.archive_ext }}
+          path: rust/${{ steps.product.outputs.product_name }}-${{ steps.package.outputs.version }}-${{ matrix.target }}.${{ matrix.archive_ext }}
 
   publish-release:
     needs: build
     # dry-run (workflow_dispatch) stops after building + uploading workflow artifacts
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    env:
+      # Needed at job level so the `if:` on the publish step can see it (GitHub does not
+      # expose secrets directly inside step conditions).
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
     outputs:
       sha_arm64: ${{ steps.compute-sha.outputs.sha_arm64 }}
       sha_x64: ${{ steps.compute-sha.outputs.sha_x64 }}
@@ -177,7 +184,7 @@ jobs:
         id: compute-sha
         run: |
           name="${{ steps.product.outputs.product_name }}"
-          tag="${{ github.ref_name }}"
+          tag="${GITHUB_REF_NAME#rust-v}"
           cd dist
           {
             echo "sha_arm64=$(sha256sum "$name-$tag-aarch64-apple-darwin.tar.gz" | cut -d ' ' -f1)"
@@ -185,6 +192,15 @@ jobs:
             echo "sha_linux_x64=$(sha256sum "$name-$tag-x86_64-unknown-linux-gnu.tar.gz" | cut -d ' ' -f1)"
             echo "sha_linux_arm64=$(sha256sum "$name-$tag-aarch64-unknown-linux-gnu.tar.gz" | cut -d ' ' -f1)"
           } >> "$GITHUB_OUTPUT"
+
+      - name: Publish crate to crates.io
+        # Distribution for Rust: `cargo install rust-thanos` (CLI) and
+        # `rust-thanos = "x.y.z"` (library). Skipped until the CARGO_REGISTRY_TOKEN secret exists.
+        if: env.CARGO_REGISTRY_TOKEN != ''
+        working-directory: rust
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: cargo publish --locked
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
@@ -236,10 +252,11 @@ jobs:
         id: prep
         run: |
           {
-            echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-aarch64-apple-darwin.tar.gz"
-            echo "url_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-x86_64-apple-darwin.tar.gz"
-            echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-x86_64-unknown-linux-gnu.tar.gz"
-            echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-${{ github.ref_name }}-aarch64-unknown-linux-gnu.tar.gz"
+            ver="${GITHUB_REF_NAME#rust-v}"
+            echo "url_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-apple-darwin.tar.gz"
+            echo "url_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-apple-darwin.tar.gz"
+            echo "url_linux_x64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-x86_64-unknown-linux-gnu.tar.gz"
+            echo "url_linux_arm64=https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/${{ steps.product_main.outputs.product_name }}-$ver-aarch64-unknown-linux-gnu.tar.gz"
           } >> "$GITHUB_OUTPUT"
       - name: Verify Tap Repo variable
         id: tap

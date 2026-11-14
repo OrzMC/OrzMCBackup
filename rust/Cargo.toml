@@ -4,11 +4,14 @@ version = "0.0.3"
 edition = "2021"
 license = "MIT"
 description = "An efficient Minecraft Java world optimization tool to detect and remove unused chunks"
-homepage = "https://github.com/OrzMC/rust-thanos"
-repository = "https://github.com/OrzMC/rust-thanos.git"
+repository = "https://github.com/OrzMC/OrzMCBackup"
+documentation = "https://github.com/OrzMC/OrzMCBackup/tree/main/rust"
 readme = "README.md"
 keywords = ["minecraft", "world", "optimization", "chunks", "rust"]
 categories = ["command-line-utilities", "games", "filesystem"]
+# Test fixtures are ~34 MB of real world data; they are needed to run the test suite in the
+# repository but must not be shipped in the crate (crates.io upload limit is 10 MB).
+exclude = ["tests/Fixtures/**", "docs/**", "bench/**"]
 
 [dependencies]
 anyhow = "1"
