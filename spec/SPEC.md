@@ -190,6 +190,7 @@
 | `vectors/forceload-corrupt/` | WOS-4.4（强制加载解析失败） | ✅ 已落地 |
 | `vectors/decompress-bomb/` | WOS-10.2（解压上限安全路径） | ✅ 已落地 |
 | `vectors/inhabited-nested/` | WOS-3.1/3.4（根层与 `Level` 兼容，嵌套同名 tag 忽略） | ✅ 已落地 |
+| `vectors/force-output-symlink/` | WOS-10.3（`--force` 不跟随符号链接删除） | ✅ 已落地 |
 
 ## 条款覆盖（机器生成）
 
@@ -202,7 +203,6 @@ python3 spec/tools/coverage.py --strict   # 有未覆盖条款即退出 1（未�
 
 | 类别 | 条款 | 说明 |
 |---|---|---|
-| 待补向量 | WOS-10.3（删除不跟随符号链接——需构造跨链接删除场景） | 夹具成本较高（破坏性场景） |
 | 库 API | WOS-5.4（注入自定义保留模式） | 各实现 API 不同（Java `extraPatterns` / Rust `--keep-range`/`pattern()`），属 WOS-11 实现定义，不做跨语言断言 |
 | 元条款 | WOS-12.1–12.4 | 描述一致性方法本身，由 `tools/*` 与 CI 实现 |
 

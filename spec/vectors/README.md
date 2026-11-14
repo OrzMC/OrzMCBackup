@@ -19,6 +19,7 @@
 3. **实现只读**：运行器把 `input/` 直接传给实现的 CLI，输出到临时目录；实现不得原地修改输入。
 4. **比较口径**：见 `spec/tools/compare.py` 与 `spec/schema/manifest.schema.json`。
 5. **可选字段**：`params.json` 支持 `world`（`symlink` = 运行器先把 `input` 做成符号链接）、
+   `force_victim`（运行器在输出目录里放一个指向 `victim/` 的符号链接并断言目标未被删）、
    `output`（`input`/`base`/`patch`，用于重叠拒绝类向量）、`expect_exit`、`expect_no_output`、
    `dry_run`、`report`（只比较规范字段）。
 
@@ -45,6 +46,7 @@
 | `forceload-corrupt` | WOS-4.4 | 强制加载文件损坏 → 视为无强制加载，正常按阈值处理 |
 | `decompress-bomb` | WOS-10.2 | 65 MiB 解压炸弹 → 安全保留、不 OOM |
 | `inhabited-nested` | WOS-3.1/3.4 | 根层/`Level` 兼容；`structures` 里的同名诱饵 tag 必须忽略 |
+| `force-output-symlink` | WOS-10.3 | `--force` 清空输出目录时不跟随符号链接（链接目标必须完好） |
 
 > 反证：`forceload-forced` 的 3 个 packed long 若按旧的「两个 long 拼一个坐标」解释，会得到
 > `(5,1)` 一个坐标并丢掉最后一项 → 保留槽位变成 `{37}`，与期望 `{5,65,650}` 不符，向量必红。

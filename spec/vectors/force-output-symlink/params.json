@@ -1,0 +1,13 @@
+{
+  "vector": "force-output-symlink",
+  "title": "force-output-symlink",
+  "command": "backup",
+  "clauses": [
+    "WOS-10.3"
+  ],
+  "args": [
+    "--inhabited-time-seconds",
+    "300"
+  ],
+  "force_victim": true
+}

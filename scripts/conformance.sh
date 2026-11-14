@@ -66,6 +66,18 @@ run_one() {
   # (overlap guards) without endangering the committed fixtures
   cp -a "$vec/input" "$work/input"
   world_path="$work/input"
+  victim=""
+  if python3 -c 'import json,sys; sys.exit(0 if json.load(open(sys.argv[1])).get("force_victim") else 1)' "$vec/params.json"; then
+    # WOS-10.3: output dir is non-empty and contains a symlink to a "victim" directory.
+    # --force must delete the link entry, never descend into it.
+    mkdir -p "$work/victim"
+    printf 'precious' >"$work/victim/data.txt"
+    mkdir -p "$out"
+    printf 'junk' >"$out/junk.dat"
+    ln -s "$work/victim" "$out/link"
+    victim="$work/victim/data.txt"
+    args="$args --force"
+  fi
   case "$world_field" in
     "") ;;
     symlink)
@@ -145,6 +157,10 @@ run_one() {
       echo "[FAIL] $impl/$name: report fields differ"
       return 1
     fi
+  fi
+  if [[ -n "$victim" && ! -f "$victim" ]]; then
+    echo "[FAIL] $impl/$name: --force followed a symlink and deleted the link target"
+    return 1
   fi
   if python3 "$ROOT/spec/tools/compare.py" "$vec/expected/manifest.json" "$work/actual.json"; then
     echo "[PASS] $impl/$name"
