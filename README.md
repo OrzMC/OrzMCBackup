@@ -140,7 +140,7 @@ java -jar backup.jar WORLD_DIR [OUTPUT_DIR] [options]
 | `--report-format` | `json` | 报告格式：`json` / `csv` |
 | `--progress-interval` | `1000` | 进度回调的区块粒度 |
 | `--progress-interval-ms` | `0` | 进度回调的时间粒度，>0 时优先 |
-| `--parallelism` | `1` | 并行线程数（同时驱动维度级与区域级并行） |
+| `--parallelism` | `1` | region 文件级并行线程数（维度按序处理，避免 parallelism² 线程） |
 | `--copy-misc` | `true` | 复制非 MCA 杂项文件（`level.dat`、`players/`、`data/` 等；`--no-copy-misc` 关闭） |
 | `--dry-run` | `false` | 预览模式，只扫描统计不写入 |
 | `--no-fsync` | `false` | 跳过 region 写入完成后的 `fsync()` 刷盘（更快，但异常掉电时持久性稍弱） |
@@ -163,6 +163,16 @@ java -jar backup.jar merge BASE PATCH OUTPUT [options]
 | `--report` | `false` | 标准输出打印合并统计 |
 | `--report-file` / `--report-format` | `null` / `json` | 报告写文件（`json` / `csv`） |
 | `--no-fsync` | `false` | 跳过 region 写入完成后的 `fsync()` 刷盘（更快，但异常掉电时持久性稍弱） |
+| `--dry-run` | `false` | 只预览槽位级合并决策，不创建/不修改任何东西 |
+| `--diff-file` | `null` | 写 chunk 级差异清单（可与真实合并同时用：先出清单再合并） |
+| `--diff-format` | `csv` | 清单格式：`csv` / `json` / `text` |
+| `--diff-include-patch` | `false` | 清单额外包含取自 patch 的槽位（行数极大） |
+| `--diff-limit` | `0` | 清单行数硬上限（0 = 不限） |
+
+> **可审计的干跑**：`merge BASE PATCH OUTPUT --dry-run --diff-file audit.csv` 不写任何文件，只输出统计 +
+> 逐 chunk 清单。清单默认只列 **`BASE` 行**（patch 里没有该 chunk、会回退到更早快照的槽位），
+> 并给出 `chunkX/chunkZ`、base 槽位保存时间、以及相对 patch 时代基准（patch 时间戳 **P90**）的
+> `revertDays`。用它就能提前知道「哪些区块会退回旧版本、退多久」。
 
 ### 退出码
 
@@ -249,7 +259,7 @@ val report = Optimizer.run(request)
 CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
   → 发现维度（递归，兼容 26.1+ 的 dimensions/ 结构）
   → 统计所有 MCA 文件中的总区块数
-  → 按维度逐个处理（串行或并行）：
+  → 按维度逐个处理（维度串行），每个维度内 region 文件可并行：
       解析强制加载坐标（chunk_tickets.dat / chunks.dat 自动探测）
       对每个区块评估保留模式（ListPattern 强制加载 + InhabitedTimePattern 阈值）
       匹配 → 重写 region + entities + poi .mca（三文件锁步）
@@ -259,6 +269,7 @@ CLI (picocli) → OptimizerRequest → DefaultOptimizer.run()
 
 **merge 槽位级合并**：对 base/patch 共有的 region，逐槽位 `patch 有该槽 ? patch : base 有该槽 ? base : 空`
 决定来源；entities/poi 与 region 锁步；仅 base 存在的 region 原样复制；损坏 patch 回退 base，保证不丢数据。
+`merge --dry-run` 用同一套判定但只读头表、不写盘，`--diff-file` 输出逐 chunk 的「回退清单」。
 
 ---
 

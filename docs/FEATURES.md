@@ -209,10 +209,30 @@ Minecraft Java 版世界优化工具，双用途：
 | `--progress-interval` | 1000 | 进度回调间隔（文件数） |
 | `--report` | false | 打印合并统计与错误 |
 | `--report-file` / `--report-format` | null / json | 报告写文件（json/csv） |
+| `--dry-run` | false | 只预览槽位级合并决策，**不创建/不修改任何东西**（输出目录可以不存在） |
+| `--diff-file` | null | 写 chunk 级差异清单（可直接配合真实合并：先出清单，再合并） |
+| `--diff-format` | csv | 清单格式：`csv` / `json` / `text` |
+| `--diff-include-patch` | false | 清单额外输出取自 patch 的槽位（行数极大） |
+| `--diff-limit` | 0 | 清单行数硬上限（0 = 不限；统计计数仍精确） |
+
+#### 差异清单（`merge --dry-run --diff-file audit.csv`）
+
+行的默认范围是「**会回退到更旧副本的槽位**」（patch 里不存在、由 base 填回的槽位），也就是最容易出问题的部分：
+
+| 列 | 含义 |
+|---|---|
+| `region` / `slot` | region 文件（世界相对路径）与槽位索引 0..1023 |
+| `chunkX` / `chunkZ` | 该槽位的全局区块坐标（`regionX*32 + slot%32`, `regionZ*32 + slot/32`） |
+| `source` | `PATCH` / `BASE` / `EMPTY` |
+| `baseEpoch` / `baseUtc` | base 槽位的保存时间戳（整列最后一次保存） |
+| `patchEpoch` / `patchUtc` | patch 槽位的时间戳（`BASE` 行为空） |
+| `revertSeconds` / `revertDays` | 相对 **patch 时代基准**（patch 侧槽位时间戳的 **P90**，按天分桶取当日结束）落后多少；≤0 表示 base 那份不比 patch 参考时间旧 |
+
+`MergeDiffIO.toText/Json` 还会额外报告 `unreadablePatchRegions`（整文件回退 base）与 `unreadableBaseRegions`（**该 region 的 base 槽位将缺失**，是当前实现的静默缺口）。
 
 ### 7.3 库 API（`WorldMerger` / `MergeReport` / `MergeReportIO`）
 
-- 入口：`WorldMerger.run(MergeRequest)` → `MergeReport`；`MergeReportIO.write(report, path, format)` 落盘 JSON/CSV。
+- 入口：`WorldMerger.run(MergeRequest)` → `MergeReport`；`WorldMerger.dryRun(MergeRequest, MergeDiffOptions)` → `MergeDiffReport`（只读预览，不落盘）；`MergeReportIO.write(report, path, format)` 落盘 JSON/CSV，`MergeDiffIO.write(diff, path, format)` 落盘差异清单。
 - `MergeReport` 字段语义：
   - `mergedRegions`：base/patch 共有、做了槽位级合并的 region 数
   - `copiedFiles` / `overlayFiles`：patch 独有的 region 文件 / 覆盖的杂项文件数
