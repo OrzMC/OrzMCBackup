@@ -166,8 +166,20 @@ tr.default td:first-child { box-shadow: inset 3px 0 0 var(--green); }
   transition: border-color .15s ease, background .15s ease;
 }
 .tab:hover { border-color: var(--text-muted); }
-.tab[aria-selected="true"] { border-color: var(--green); background: var(--green-soft); }
-.tab .tab-name { display: flex; align-items: center; gap: 8px; color: var(--text-strong); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.tab[aria-selected="true"] {
+  border-color: var(--green);
+  background: rgba(63, 185, 80, 0.14);
+  box-shadow: inset 0 0 0 1px var(--green-border), 0 6px 20px -14px var(--green);
+}
+.tab:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
+.tab .tab-name { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; row-gap: 4px; color: var(--text-strong); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.tab[aria-selected="true"] .tab-name { color: var(--green); }
+.tab[aria-selected="true"] .tab-desc { color: var(--text); }
+.tab .tab-current {
+  display: none; margin-left: auto; font-size: 11px; font-weight: 500;
+  color: var(--green); border: 1px solid var(--green-border); border-radius: 999px; padding: 1px 8px;
+}
+.tab[aria-selected="true"] .tab-current { display: inline-block; }
 .tab .tab-desc { display: block; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
 .pill {
   font-size: 11px; font-weight: 500; color: var(--green);
@@ -421,8 +433,10 @@ footer a:hover { color: var(--green); }
       <li><b>60 秒就拿到了大部分收益。</b>保留区块从 90.8 万降到 27.6 万，体积从 6.9 GB 掉到 2.6 GB；再往上加到 300 秒，只多省 413 MB。</li>
       <li><b>六档阈值都没有出现预期外的丢失。</b>每一档都和优化前的世界逐字节比对过，阈值只决定砍多少，不会决定砍错。</li>
       <li><b>耗时几乎不受阈值影响。</b>15 到 27 分钟都由读盘主导，所以选阈值的唯一代价是"多留一点旧地块"，不是"备份变慢"。</li>
-      <li><b>怎么选：</b>日常备份用 <code>-t 60</code> 到 <code>-t 120</code> 就够；默认的 300 更保守；
-          <code>-t 0</code> 只适合归档旧周目，它会把没被玩家真正访问过的区块全部切掉。</li>
+      <li><b>怎么选：</b><code>-t</code> 的数字越大，保留的区块越少、备份越小，也就越激进。
+          日常备份用 60 到 120 秒就够——60 秒已剔除 91.3%、120 秒 92.1%，都接近 300 秒的 92.7%。
+          默认的 300 秒更激进一些，会再砍掉"只被路过几分钟"的地块（保留 23.2 万区块 / 2.18 GB）；
+          <code>-t 0</code> 反而是保留最多的一档，只排除从未被访问过的区块（保留 90.8 万区块 / 6.86 GB）。</li>
     </ul>
     <p class="source-note">
       完整数据与验证方法：<a href="doc.html?file=threshold-benchmark-report.md">阈值基准测试报告</a>
@@ -515,11 +529,11 @@ footer a:hover { color: var(--green); }
 
     <div class="tabs" role="tablist" aria-label="选择实现">
       <button class="tab" type="button" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="true" data-impl="java">
-        <span class="tab-name">Java 版 <span class="pill">推荐</span></span>
+        <span class="tab-name">Java 版 <span class="pill">推荐</span><span class="tab-current">当前查看</span></span>
         <span class="tab-desc">JDK 17+ 就能跑，一个 JAR 跨平台；插件与二次开发也用它</span>
       </button>
       <button class="tab" type="button" role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="false" data-impl="rust" tabindex="-1">
-        <span class="tab-name">Rust 版</span>
+        <span class="tab-name">Rust 版<span class="tab-current">当前查看</span></span>
         <span class="tab-desc">单个可执行文件，不用装 JVM，启动快</span>
       </button>
     </div>
@@ -696,8 +710,9 @@ println!("扫描 {}，剔除 {}", report.processed_chunks, report.removed_chunks
     <details>
       <summary>阈值 <code>-t</code> 设多少合适？</summary>
       <p>
-        日常用 60 到 120 秒：实测 60 秒就拿到了 91.3% 的剔除率，再往上一档只多省一点体积。
-        默认的 300 秒更保守，适合不确定玩家行为的情况。<code>-t 0</code> 很激进，只适合归档旧周目。
+        判断看的是数字往哪边走：<code>-t</code> 越大，剔除越多。日常用 60 到 120 秒就在收益拐点上
+        （剔除率 91.3% / 92.1%，而 300 秒是 92.7%），够用且更安全；默认的 300 秒更激进，会连"只被路过几分钟"
+        的地块一起收掉；<code>-t 0</code> 最宽松，只排除从未被访问过的区块，适合"宁可多留一点"的场景。
       </p>
       <p>第一次用先跑 <code>--dry-run --report</code>，它会告诉你这份世界会保留多少区块、砍掉多少，不写任何文件。</p>
     </details>
