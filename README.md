@@ -97,17 +97,21 @@ Minecraft 区块一旦生成就不会自动消失。玩家探索、跑图、飞�
 
 ## 快速开始
 
-### 安装（预编译，推荐普通人用这条）
+### 安装（预编译）
+
+默认建议用 **Java CLI**：机器上有 JDK 17+ 就能跑，Windows / Linux / macOS 是同一个 `backup.jar`；
+写插件或把自己的工具接进来时，同一套引擎也发布在 Maven Central。
 
 | 渠道 | 命令 | 适用 |
 |---|---|---|
-| **Homebrew**（macOS / Linux，Rust CLI） | `brew tap orzmc/core && brew trust orzmc/core && brew install rust-thanos` | 不想装 Rust 工具链 |
-| **crates.io**（Rust CLI） | `cargo install rust-thanos` | 有 Rust 工具链，一条命令装好 |
-| **GitHub Release**（Java CLI） | 从 [`java-v0.3.2`](https://github.com/OrzMC/OrzMCBackup/releases) 下载 `backup.jar`（附 `SHA256SUMS`） | 有 JVM 17+，想要单文件 |
-| **Maven Central**（库） | `io.github.wangzhizhou:backup-core:0.3.2` | 集成进自己的工具/JVM 服务 |
+| **GitHub Release**（Java CLI，推荐） | 从 [`java-v0.3.2`](https://github.com/OrzMC/OrzMCBackup/releases) 下载 `backup.jar`（附 `backup.jar.sha256`） | 有 JDK 17+，单个 JAR 跨平台 |
+| **Maven Central**（库） | `io.github.wangzhizhou:backup-core:0.3.2` | 二次开发：插件 / JVM 服务 / 自己的工具 |
+| **Homebrew**（macOS / Linux，Rust CLI） | `brew tap orzmc/core && brew trust orzmc/core && brew install rust-thanos` | 不想在服务器上装 JVM，也不想装 Rust 工具链 |
+| **crates.io**（Rust CLI / 库） | `cargo install rust-thanos` | 有 Rust 工具链，或要在 Rust 里嵌库 |
 
 > 当前版本：Java `0.3.2` · Rust `0.0.5`。两个 CLI 的命令行接口一致（同一份 `spec/SPEC.md` 约束），
-> 按运行环境挑一个即可：Rust 版启动快、单二进制无依赖；Java 版与库共用同一套引擎。
+> 备份与合并的结果也一致，可以按机器挑：Java 版跨平台一致、库生态（插件 / 二次开发）在这边；
+> Rust 版更轻，单文件无运行时依赖、启动更快，适合只跑备份任务的机器。
 
 ### 构建（从源码）
 
@@ -117,6 +121,9 @@ java/gradlew -p java :app:shadowJar --no-daemon
 
 产物：`java/app/build/libs/backup.jar`（文件名固定；版本号写入 manifest，`--version` 可查）。
 本地默认版本 `0.1.0`；用 `-Pversion=X.Y.Z` 注入（如 `-Pversion=0.3.2`）。
+
+Rust 侧：`cd rust && cargo build --release` → `rust/target/release/rust-thanos`（测试、fmt/clippy 与发布细节见
+[`rust/README.md`](rust/README.md)）。
 
 ### 优化备份
 
@@ -223,7 +230,10 @@ java -jar backup.jar merge BASE PATCH OUTPUT [options]
 
 ## 作为库使用
 
-发布到 Maven Central（`io.github.wangzhizhou:backup-core`），支持 Kotlin DSL 与 Java。
+两套实现都是「库 + CLI」双形态。Java 侧是下面这节的 Maven Central 构件（推荐：插件与服务端工具都在 JVM 上）；
+Rust 侧是 crates.io 上的 `rust-thanos`，用法见 [`rust/README.md`](rust/README.md)（`rust-thanos = "0.0"`）。
+
+Java 库发布到 Maven Central（`io.github.wangzhizhou:backup-core`），支持 Kotlin DSL 与 Java。
 
 ```kotlin
 dependencies {
@@ -277,6 +287,7 @@ val request = OptimizerRequest(
 **merge 复用（`WorldMerger`）**：`WorldMerger.run(MergeRequest)` 与 CLI `merge` 使用完全相同的
 槽位级合并算法；`MergeReportIO.write(report, path, format)` 无损落盘 JSON/CSV。
 
+> 在 Paper 插件里调用时，把备份放进自己的调度（异步任务）里执行，不要占服务端主线程。
 > 完整配置模型、参数速查与全部示例见 [`docs/FEATURES.md`](docs/FEATURES.md)。Java 用法与旧版
 > `OptimizerConfig` 迁移说明亦在其中。
 
