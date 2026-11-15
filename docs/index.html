@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Minecraft Java 世界优化备份工具：按玩家活跃时间（InhabitedTime）逐区块裁剪世界体积，实测 -88.3% 零非预期数据丢失；优化备份与全量备份可槽位级合并恢复。Kotlin + Rust 双实现，共享一份一致性规范；Homebrew / crates.io / 单文件 JAR 三种安装方式。">
-<meta property="og:title" content="OrzMCBackup — Minecraft 世界优化备份工具">
-<meta property="og:description" content="按玩家活跃时间逐区块裁剪世界体积：实测 -88.3%，零非预期数据丢失，支持槽位级合并恢复。Kotlin + Rust 双实现，Homebrew / crates.io / JAR 安装。">
+<meta name="description" content="服务器存档只涨不跌，备份越来越慢？OrzMCBackup 备份时按玩家在区块里的停留时间筛选，18.6 GB 的世界备份到 2.2 GB，六档阈值逐字节比对无预期外丢失；瘦身备份还能和更早的全量备份按区块合并恢复。Rust 单文件与 Java JAR 两种装法。">
+<meta property="og:title" content="OrzMCBackup — 让 Minecraft 世界备份从 18.6 GB 变成 2.2 GB">
+<meta property="og:description" content="按玩家停留时间逐区块筛选，只把用得到的区块写进备份。六档阈值实测无预期外丢失，瘦身备份可与旧全量备份合并恢复。">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://orzmc.github.io/OrzMCBackup/">
-<title>OrzMCBackup — Minecraft 世界优化备份工具</title>
+<title>OrzMCBackup — 让 Minecraft 世界备份从 18.6 GB 变成 2.2 GB</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⛏️</text></svg>">
 <style>
 :root {
@@ -47,7 +47,7 @@ h2 {
   margin-bottom: 12px;
   letter-spacing: 0.5px;
 }
-.section-sub { color: var(--text-muted); margin-bottom: 36px; max-width: 760px; }
+.section-sub { color: var(--text-muted); margin-bottom: 36px; max-width: 780px; }
 h2 .accent { color: var(--green); }
 
 /* ---------- Nav ---------- */
@@ -87,8 +87,8 @@ nav {
 }
 .hero h1 {
   font-size: clamp(2rem, 5vw, 3.1rem);
-  line-height: 1.2; color: var(--text-strong); font-weight: 700;
-  letter-spacing: 0.5px; margin-bottom: 20px; max-width: 820px;
+  line-height: 1.22; color: var(--text-strong); font-weight: 700;
+  letter-spacing: 0.5px; margin-bottom: 20px; max-width: 840px;
 }
 .hero .sub { font-size: clamp(1rem, 1.6vw, 1.15rem); color: var(--text-muted); max-width: 720px; margin-bottom: 32px; }
 .hero .sub strong { color: var(--text-strong); font-weight: 600; }
@@ -102,8 +102,9 @@ nav {
 }
 .chip .num { font-size: 15px; font-weight: 600; color: var(--green); }
 
-/* ---------- Why ---------- */
+/* ---------- Cards ---------- */
 .grid-3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.grid-6 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
 .card {
   background: var(--bg-elev); border: 1px solid var(--border);
   border-radius: var(--radius); padding: 24px;
@@ -111,6 +112,7 @@ nav {
 .card h3 { color: var(--text-strong); font-size: 16.5px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
 .card h3 .ico { font-size: 20px; }
 .card p { font-size: 14.5px; color: var(--text-muted); }
+.card p + p { margin-top: 8px; }
 .note {
   margin-top: 20px; padding: 14px 18px; border-radius: var(--radius);
   border: 1px solid var(--green-border); background: var(--green-soft);
@@ -132,14 +134,13 @@ tr.default td:first-child { box-shadow: inset 3px 0 0 var(--green); }
   border: 1px solid var(--green-border); border-radius: 999px;
   padding: 1px 8px; margin-right: 8px; vertical-align: 1px;
 }
-.takeaways { margin-top: 24px; display: grid; gap: 12px; }
-.takeaway {
-  display: flex; gap: 12px; align-items: flex-start;
+.findings { list-style: none; margin-top: 24px; display: grid; gap: 12px; }
+.findings li {
   background: var(--bg-elev); border: 1px solid var(--border);
+  border-left: 3px solid var(--green-border);
   border-radius: var(--radius); padding: 16px 18px; font-size: 14.5px;
 }
-.takeaway .mark { color: var(--green); font-weight: 700; flex-shrink: 0; line-height: 1.4; }
-.takeaway b { color: var(--text-strong); }
+.findings b { color: var(--text-strong); }
 .source-note { margin-top: 14px; font-size: 13px; color: var(--text-muted); }
 
 /* ---------- Pipeline ---------- */
@@ -156,9 +157,29 @@ tr.default td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .step .title { color: var(--text-strong); font-size: 14px; font-weight: 600; margin-bottom: 4px; }
 .step p { color: var(--text-muted); font-size: 12.5px; }
 
-/* ---------- Features ---------- */
-.grid-6 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; }
-.card .kbd { font-family: var(--mono); font-size: 13px; color: var(--green); }
+/* ---------- Tabs (按实现切换) ---------- */
+.tabs { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 20px; }
+.tab {
+  flex: 1 1 260px; text-align: left; cursor: pointer;
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 16px 18px; color: var(--text); font-family: var(--sans);
+  transition: border-color .15s ease, background .15s ease;
+}
+.tab:hover { border-color: var(--text-muted); }
+.tab[aria-selected="true"] { border-color: var(--green); background: var(--green-soft); }
+.tab .tab-name { display: flex; align-items: center; gap: 8px; color: var(--text-strong); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
+.tab .tab-desc { display: block; font-size: 13px; color: var(--text-muted); line-height: 1.5; }
+.pill {
+  font-size: 11px; font-weight: 500; color: var(--green);
+  border: 1px solid var(--green-border); border-radius: 999px; padding: 1px 8px;
+}
+.panel[hidden] { display: none; }
+.panel .lead { font-size: 15px; color: var(--text); margin-bottom: 20px; max-width: 820px; }
+.panel h3 {
+  font-size: 15px; color: var(--text-strong); font-weight: 600;
+  margin: 24px 0 12px; padding-top: 20px; border-top: 1px dashed var(--border);
+}
+.panel h3:first-of-type { margin-top: 0; padding-top: 0; border-top: none; }
 
 /* ---------- Code blocks ---------- */
 .codeblock { border: 1px solid var(--border); border-radius: var(--radius); background: var(--bg-elev); margin-bottom: 18px; overflow: hidden; }
@@ -175,7 +196,23 @@ tr.default td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .copy:hover { color: var(--text-strong); border-color: var(--text-muted); }
 .codeblock pre { padding: 14px 16px; overflow-x: auto; }
 .codeblock code { font-size: 13.5px; color: var(--text); line-height: 1.6; white-space: pre; }
-.code-note { font-size: 13.5px; color: var(--text-muted); margin-top: 6px; }
+.code-note { font-size: 13.5px; color: var(--text-muted); margin-top: -6px; margin-bottom: 18px; }
+
+/* ---------- FAQ ---------- */
+details {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px 18px; margin-bottom: 10px;
+}
+details summary {
+  cursor: pointer; list-style: none; display: flex; align-items: flex-start; gap: 12px;
+  color: var(--text-strong); font-weight: 600; font-size: 15px;
+}
+details summary::-webkit-details-marker { display: none; }
+details summary::after { content: '+'; margin-left: auto; color: var(--green); font-family: var(--mono); }
+details[open] summary::after { content: '−'; }
+details[open] summary { margin-bottom: 10px; }
+details p { font-size: 14.5px; color: var(--text-muted); }
+details p + p { margin-top: 8px; }
 
 /* ---------- Docs ---------- */
 .doc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
@@ -186,6 +223,8 @@ tr.default td:first-child { box-shadow: inset 3px 0 0 var(--green); }
 .doc:hover { border-color: var(--green-border); background: var(--bg-hover); text-decoration: none; }
 .doc .t { color: var(--text-strong); font-weight: 600; font-size: 15px; margin-bottom: 6px; }
 .doc .d { color: var(--text-muted); font-size: 13.5px; }
+.docs-group + .docs-group { margin-top: 28px; }
+.docs-group h3 { color: var(--text-muted); font-size: 13px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 12px; }
 
 /* ---------- CTA ---------- */
 .cta-banner {
@@ -231,12 +270,12 @@ footer a:hover { color: var(--green); }
     <a class="brand" href="#"><span class="logo">⛏️</span>OrzMCBackup</a>
     <button class="hamburger" aria-label="菜单" aria-expanded="false">☰</button>
     <div class="nav-links" id="navLinks">
-      <a href="#why">为什么需要</a>
-      <a href="#metrics">实测效果</a>
-      <a href="#features">核心特性</a>
-      <a href="#how">工作原理</a>
-      <a href="#install">安装</a>
-      <a href="#quickstart">快速开始</a>
+      <a href="#why">用得上吗</a>
+      <a href="#metrics">实测</a>
+      <a href="#features">做了什么</a>
+      <a href="#how">流程</a>
+      <a href="#install">安装与使用</a>
+      <a href="#faq">常见问题</a>
       <a href="#docs">文档</a>
       <a class="btn nav-btn" href="https://github.com/OrzMC/OrzMCBackup" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
@@ -245,58 +284,60 @@ footer a:hover { color: var(--green); }
 
 <header class="hero">
   <div class="container">
-    <span class="tag">开源 · Apache-2.0 · Kotlin + Rust — 面向 PaperMC / Vanilla</span>
-    <h1>Minecraft 世界优化备份工具</h1>
+    <span class="tag">开源 · Apache-2.0 · PaperMC 与官方服务端通用</span>
+    <h1>世界越玩越大，<span class="accent">备份却可以很小</span></h1>
     <p class="sub">
-      按玩家活跃时间（InhabitedTime）<strong>逐区块裁剪世界体积</strong>——备份更小、恢复更快、保留更高频。
-      优化备份与全量备份可<strong>槽位级合并恢复</strong>，实测<strong>零非预期数据丢失</strong>。
-      Kotlin 与 Rust 两份实现共享同一份规范与一致性向量，行为可逐字节对照上游。
+      服务器开得越久，存档里"路过一次就再没回去"的空地就越多，它们和主城占一样的体积。
+      OrzMCBackup 在备份时按玩家在每个区块里的停留时间筛选，<strong>只把真正用得到的区块写进备份</strong>。
+      18.6 GB 的真实世界实测备份到 2.2 GB，六档阈值逐字节比对，没有出现预期外的数据丢失。
+      以后想翻回更早的地图，还能把瘦身备份和旧的全量备份按区块合起来恢复。
     </p>
     <div class="cta-row">
-      <a class="btn btn-solid btn-lg" href="#quickstart">快速开始</a>
-      <a class="btn btn-lg" href="https://github.com/OrzMC/OrzMCBackup" target="_blank" rel="noopener">查看 GitHub</a>
+      <a class="btn btn-solid btn-lg" href="#install">选个版本装起来</a>
+      <a class="btn btn-lg" href="#metrics">先看实测数据</a>
     </div>
     <div class="chips">
-      <span class="chip"><span class="num">-88.3%</span> 体积</span>
-      <span class="chip"><span class="num">92.7%</span> 区块剔除</span>
-      <span class="chip"><span class="num">0</span> 非预期数据丢失</span>
-      <span class="chip"><span class="num">26.1+</span> 新格式</span>
-      <span class="chip"><span class="num">24</span> 一致性向量</span>
+      <span class="chip"><span class="num">18.6 GB → 2.2 GB</span> 同一份世界</span>
+      <span class="chip"><span class="num">92.7%</span> 区块不进备份</span>
+      <span class="chip"><span class="num">0</span> 例预期外丢失</span>
+      <span class="chip">默认阈值 <span class="num">5 分钟</span></span>
+      <span class="chip">支持 <span class="num">26.1+</span> 新存档格式</span>
     </div>
   </div>
 </header>
 
 <section id="why">
   <div class="container">
-    <h2>为什么需要</h2>
-    <p class="section-sub">Minecraft 区块一经生成就不会自动消失——世界体积只涨不跌，备份成本随之失控。</p>
+    <h2>你大概会遇到这三种情况</h2>
+    <p class="section-sub">它们看起来是三件事，其实是同一个原因：备份里塞进了太多没人会再回去的区块。</p>
     <div class="grid-3">
       <div class="card">
-        <h3><span class="ico">🌍</span>区块永久生成</h3>
-        <p>玩家探索、跑图、飞行会永久生成大量区块。其中绝大部分是"路过但从未建设"的区块，却与真正建设过的区块占用相同存储。</p>
+        <h3><span class="ico">💾</span>硬盘总是不够用</h3>
+        <p>开服半年，存档从几百 MB 涨到十几 GB，备份目录再翻一倍。加硬盘能撑一阵，但下个半年还得加。</p>
       </div>
       <div class="card">
-        <h3><span class="ico">📈</span>体积持续膨胀</h3>
-        <p>世界体积只增不减，备份文件随之膨胀。存储成本、传输耗时、恢复时长全部被动上升，备份保留策略被迫越来越稀疏。</p>
+        <h3><span class="ico">⏳</span>备份挤不进日常</h3>
+        <p>全量备份越跑越久，只好从每天一次改成每周一次。真出事的时候，能回滚的时间点反而变少了。</p>
       </div>
       <div class="card">
-        <h3><span class="ico">🔄</span>合并恢复缺口</h3>
-        <p>当只剩「优化备份 + 更早的全量备份」时，直接同名覆盖会造成地图空洞或地形回退——需要一个安全的合并恢复手段。</p>
+        <h3><span class="ico">↩️</span>想回滚却没得回</h3>
+        <p>为了省空间只留下瘦身后的备份。需要翻回三个月前的地图时，直接把旧备份覆盖上去会留下空洞和回退的地形。</p>
       </div>
     </div>
     <div class="note">
-      <b>OrzMCBackup</b> 在备份前按 InhabitedTime 阈值剔除低活跃区块，并自动保护强制加载区块；
-      若需要恢复更早的全量备份，<code>merge</code> 子命令以 chunk 槽位粒度合并，恢复"全量最新"地图。
+      OrzMCBackup 只在这件事上做取舍：不活跃的区块不进备份。其余数据照常备份——
+      出生点和加载器所在的区块、玩家目录、<code>level.dat</code>、插件数据目录都完整复制；
+      读不懂或损坏的文件不会被丢掉，而是原样保留并在报告里记一条。
     </div>
   </div>
 </section>
 
 <section id="metrics">
   <div class="container">
-    <h2>实测效果 · 六档阈值对比</h2>
+    <h2>实测：同一份世界，只改一个阈值</h2>
     <p class="section-sub">
-      对同一真实 PaperMC 26.2 恢复合并世界（28,451 文件 / 18,637.6 MB / 3,162,906 区块），仅改变 <code>-t</code>
-      阈值各跑一次完整备份，其余参数一致（<code>--copy-misc --parallelism 4</code>，HDD 实测）。
+      真实 PaperMC 26.2 世界（28,451 个文件、18,637.6 MB、3,162,906 个区块），跑了六次完整备份，
+      每次只改 <code>-t</code>（活跃时间阈值），其余参数一致：<code>--copy-misc --parallelism 4</code>，机械硬盘。
     </p>
     <div class="table-wrap">
       <table>
@@ -376,161 +417,357 @@ footer a:hover { color: var(--green); }
         </tbody>
       </table>
     </div>
-    <div class="takeaways">
-      <div class="takeaway"><span class="mark">◆</span><span><b>60 秒是收益拐点</b>：从 t0 到 t60，保留区块 908K→276K（骤降 70%），输出 6.9GB→2.6GB；从 t60 到 t300 仅再省约 413 MB。<b>60 秒剔除率 91.3%，相当于 t300（92.7%）的约 98%</b>。</span></div>
-      <div class="takeaway"><span class="mark">◆</span><span><b>六档阈值下非预期数据丢失均为 0</b>（逐字节验证）——优化不丢数据，阈值只决定"砍多少"，不决定"砍错"。</span></div>
-      <div class="takeaway"><span class="mark">◆</span><span><b>阈值几乎不影响耗时</b>（HDD 上 15–27 分钟，由输入读取主导），只影响体积。<code>-t 0</code> 适合激进归档（仅保留玩家真实访问过的区块），运营者默认 <code>60–120</code> 秒即可。</span></div>
-    </div>
-    <p class="source-note">数据来源：<a href="doc.html?file=threshold-benchmark-report.md">threshold-benchmark-report.md</a>（逐字节验证：0 新文件 / 0 槽位伪造 / 0 锁步违规 / removedChunks 与槽位差严格吻合）</p>
+    <ul class="findings">
+      <li><b>60 秒就拿到了大部分收益。</b>保留区块从 90.8 万降到 27.6 万，体积从 6.9 GB 掉到 2.6 GB；再往上加到 300 秒，只多省 413 MB。</li>
+      <li><b>六档阈值都没有出现预期外的丢失。</b>每一档都和优化前的世界逐字节比对过，阈值只决定砍多少，不会决定砍错。</li>
+      <li><b>耗时几乎不受阈值影响。</b>15 到 27 分钟都由读盘主导，所以选阈值的唯一代价是"多留一点旧地块"，不是"备份变慢"。</li>
+      <li><b>怎么选：</b>日常备份用 <code>-t 60</code> 到 <code>-t 120</code> 就够；默认的 300 更保守；
+          <code>-t 0</code> 只适合归档旧周目，它会把没被玩家真正访问过的区块全部切掉。</li>
+    </ul>
+    <p class="source-note">
+      完整数据与验证方法：<a href="doc.html?file=threshold-benchmark-report.md">阈值基准测试报告</a>
+      （0 新文件 / 0 槽位伪造 / 0 锁步违规 / removedChunks 与槽位差严格吻合）
+    </p>
   </div>
 </section>
 
 <section id="features">
   <div class="container">
-    <h2>核心特性</h2>
-    <p class="section-sub">面向服务端运营的备份优化，把"安全"放在第一位。</p>
+    <h2>它到底做了什么</h2>
+    <p class="section-sub">备份前逐区块做判断，只做筛选，不重写地形。</p>
     <div class="grid-6">
       <div class="card">
-        <h3>🎯 InhabitedTime 阈值裁剪</h3>
-        <p>按玩家累计活跃时间（严格 <span class="kbd">&gt;</span>）逐区块保留；<span class="kbd">-t 0</span> 可移除从未被访问的区块。</p>
+        <h3><span class="ico">🎯</span>按停留时间筛区块</h3>
+        <p>每个区块都记录着玩家在里面累计待了多久（InhabitedTime）。够阈值就保留，不够就整块跳过。
+          <span class="num">-t 0</span> 的意思是：没被访问过的就别进备份了。</p>
       </div>
       <div class="card">
-        <h3>🛡️ 强制加载保护</h3>
-        <p>自动解析并保留出生点 / 区块加载器所在区块，兼容新旧格式（<span class="kbd">chunk_tickets.dat</span> → <span class="kbd">chunks.dat</span>）。</p>
+        <h3><span class="ico">🛡️</span>该留的一定会留</h3>
+        <p>出生点、区块加载器、传送门所在的区块会被自动识别并保留，新旧两种存档格式都认。
+          不会出现"主城被裁掉了"这种事。</p>
       </div>
       <div class="card">
-        <h3>🔒 三文件锁步</h3>
-        <p>region / entities / poi 按同一决策同步重写，杜绝"有地形无实体 / POI"的数据错位。</p>
+        <h3><span class="ico">🔒</span>地形、实体、POI 同步处理</h3>
+        <p>region、entities、poi 三个目录按同一份判断重写，避免出现地形还在、箱子或刷怪笼却没了的数据错位。</p>
       </div>
       <div class="card">
-        <h3>✂️ 惰性写入</h3>
-        <p>整区被剔除的 region 不生成空文件；幸存区块逐字节不变。</p>
+        <h3><span class="ico">🧯</span>读不懂的东西原样保留</h3>
+        <p>损坏的区块、无法解析的 region 文件不会被丢弃，整份复制进备份，只在报告里记一条错误。
+          备份任务不该因为一处坏数据而少东西。</p>
       </div>
       <div class="card">
-        <h3>🧩 26.1+ 新格式</h3>
-        <p>兼容 <span class="kbd">dimensions/</span> 嵌套结构（PaperMC 26.1+ / Vanilla），自动递归发现维度。</p>
+        <h3><span class="ico">🧩</span>认得出新存档结构</h3>
+        <p>26.1 之后维度挂在 <span class="num">dimensions/</span> 下的新布局会自动递归发现，
+          1.2.1 以来的老布局照旧，不需要手动指路径。</p>
       </div>
       <div class="card">
-        <h3>🔁 merge 槽位级合并恢复</h3>
-        <p>优化备份 + 全量备份按 chunk 槽位粒度合并，patch 优先、base 填空槽；损坏 patch 自动回退 base。
-          <span class="kbd">merge --dry-run --diff-file</span> 先出逐 chunk 回退清单，确认后再落盘（Java 版提供）。</p>
+        <h3><span class="ico">🗂️</span>输出方式随便挑</h3>
+        <p>写进新目录、原地替换、打成 zip，或者只跑一遍看会砍掉多少（<span class="num">--dry-run</span>）。
+          杂项文件默认一起复制。</p>
       </div>
       <div class="card">
-        <h3>📐 一份规范，两套实现</h3>
-        <p>语言无关的 <span class="kbd">spec/</span>（WOS-### 条款 + 一致性向量）是真值：Kotlin 与 Rust 都要通过
-          <span class="kbd">scripts/conformance.sh</span>，分歧必须登记，未登记即失败。</p>
+        <h3><span class="ico">🤖</span>能挂进脚本</h3>
+        <p>JSON / CSV 报告、退出码、并行度、进度输出都可配。放进 cron、面板或托管商的备份任务里不需要人盯着。</p>
       </div>
       <div class="card">
-        <h3>🧪 与上游逐字节对照</h3>
-        <p>官方 PHP 实现作为只读参考一起进一致性门禁（允许的差异登记为 xfail），发现的缺陷已回馈上游。</p>
+        <h3><span class="ico">🔁</span>瘦身备份还能合回去</h3>
+        <p><span class="num">merge</span> 把瘦身备份贴回更早的全量备份，按区块槽位补全，得到一份"最新 + 全量"的地图。
+          这是瘦身备份敢长期替代全量备份的前提。</p>
       </div>
+      <div class="card">
+        <h3><span class="ico">🧱</span>命令行只是外壳</h3>
+        <p>两套实现都同时是库：JVM 侧发布在 Maven Central，Rust 侧发布在 crates.io。
+          想自己定义保留规则、接进面板或备份系统，可以按下面的示例直接调，不用拼命令行。</p>
+      </div>
+    </div>
+    <div class="note">
+      两个实现，同一套行为：Rust 版和 Kotlin 版各自独立实现，跑同一组 24 个一致性向量；
+      官方 PHP 版 thanos 也作为对照一起校验，允许的差异全部登记在案。
+      也就是说，下面你随便挑一个装，拿到的是同一个工具。
     </div>
   </div>
 </section>
 
 <section id="how">
   <div class="container">
-    <h2>工作原理</h2>
-    <p class="section-sub">一条可并行、可审计的优化管道。</p>
+    <h2>一次备份的流程</h2>
+    <p class="section-sub">六步，每一步都能在报告里核对。</p>
     <div class="steps">
-      <div class="step"><span class="idx">1</span><div class="title">发现维度</div><p>递归扫描，兼容 26.1+ 的 dimensions/ 嵌套结构</p></div>
-      <div class="step"><span class="idx">2</span><div class="title">统计区块</div><p>统计全部 MCA 文件中的区块总数</p></div>
-      <div class="step"><span class="idx">3</span><div class="title">解析强制加载</div><p>chunk_tickets.dat / chunks.dat 自动探测坐标</p></div>
-      <div class="step"><span class="idx">4</span><div class="title">逐块评估</div><p>强制加载列表 + InhabitedTime 阈值联合判定保留</p></div>
-      <div class="step"><span class="idx">5</span><div class="title">锁步重写</div><p>region + entities + poi 按同一决策重写 .mca</p></div>
-      <div class="step"><span class="idx">6</span><div class="title">收尾输出</div><p>复制杂项文件 / ZIP 打包 / 原地替换 / 生成报告</p></div>
+      <div class="step"><span class="idx">1</span><div class="title">找到维度</div><p>递归扫描世界目录，新老结构都覆盖</p></div>
+      <div class="step"><span class="idx">2</span><div class="title">数清区块</div><p>统计所有 region 文件里的区块总数</p></div>
+      <div class="step"><span class="idx">3</span><div class="title">读强制加载清单</div><p>自动找到 tickets / chunks 数据里的坐标</p></div>
+      <div class="step"><span class="idx">4</span><div class="title">逐块判断</div><p>强制加载清单和停留时间，任一命中即保留</p></div>
+      <div class="step"><span class="idx">5</span><div class="title">同步重写</div><p>region + entities + poi 按同一决策落盘</p></div>
+      <div class="step"><span class="idx">6</span><div class="title">收尾</div><p>复制杂项、可选打 zip、可选原地替换、写报告</p></div>
     </div>
     <div class="note">
-      <b>merge 槽位级合并</b>：对 base / patch 共有的 region，逐槽位按
-      <code>patch 有该槽 ? patch : base 有该槽 ? base : 空</code> 决定来源；entities / poi 与 region 锁步；
-      仅 base 存在的 region 原样复制。真实案例：18.64 GB 全量 + 2.18 GB 优化 → 约 18 GB 完整恢复。
+      <b>merge 怎么合：</b>对两边都有的 region 文件，逐个区块槽位取"瘦身备份里有就用它，没有就用全量备份里的"；
+      entities 和 poi 跟着 region 一起决定；只在全量备份里出现的文件原样复制。
+      真实案例：18.6 GB 全量 + 2.18 GB 瘦身备份，合并出一份约 18 GB 的完整世界。
     </div>
   </div>
 </section>
 
 <section id="install">
   <div class="container">
-    <h2>安装</h2>
-    <p class="section-sub">
-      三种装法任选其一。两个 CLI（Rust 的 <code>rust-thanos</code> 与 Java 的 <code>backup.jar</code>）
-      参数完全一致——都受同一份 <code>spec/SPEC.md</code> 约束，按运行环境挑一个即可。
-    </p>
+    <h2>安装与使用</h2>
+    <p class="section-sub">两个版本命令和参数一致，按你的环境挑一个。选完之后这一屏只显示这一种装法。</p>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — Homebrew（macOS / Linux，Rust CLI）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>brew tap orzmc/core
-brew trust orzmc/core      # 新版 Homebrew 要求第三方 tap 显式信任
+    <div class="tabs" role="tablist" aria-label="选择实现">
+      <button class="tab" type="button" role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="true" data-impl="rust">
+        <span class="tab-name">Rust 版 <span class="pill">推荐</span></span>
+        <span class="tab-desc">单个可执行文件，不用装 JVM，启动快</span>
+      </button>
+      <button class="tab" type="button" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="false" data-impl="java" tabindex="-1">
+        <span class="tab-name">Java 版</span>
+        <span class="tab-desc">一个 JAR，机器上有 JDK 17+ 就能跑；也能当库用</span>
+      </button>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" tabindex="0">
+      <p class="lead">
+        适合把备份写进脚本或定时任务：装完就是一个 <code>rust-thanos</code> 命令，没有运行时依赖，冷启动几乎不占时间。
+      </p>
+
+      <h3>安装</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — Homebrew（macOS / Linux）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>brew tap orzmc/core
+brew trust orzmc/core      # 新版 Homebrew 要求第三方 tap 先显式信任
 brew install rust-thanos</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 有 Rust 工具链，或者直接下预编译包</span><button class="copy" type="button">复制</button></div>
+        <pre><code>cargo install rust-thanos      # 装到 ~/.cargo/bin</code></pre>
+      </div>
+      <p class="code-note">
+        不想装工具链的话，也可以从
+        <a href="https://github.com/OrzMC/OrzMCBackup/releases" target="_blank" rel="noopener">Release</a>
+        下载对应平台的压缩包（macOS / Linux / Windows，x86_64 与 arm64 都有），解压后放进 PATH。
+      </p>
+
+      <h3>三条命令上手</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 1. 先看会砍掉多少，不写盘</span><button class="copy" type="button">复制</button></div>
+        <pre><code>rust-thanos backup /path/to/world --dry-run --report</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 2. 正式备份（默认阈值 5 分钟，输出打成 zip）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>rust-thanos backup /path/to/world /path/to/out -t 300 --zip-output</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 3. 需要翻回更早的地图时合并</span><button class="copy" type="button">复制</button></div>
+        <pre><code>rust-thanos merge 更早的全量备份 瘦身备份 输出目录 --report</code></pre>
+      </div>
+      <p class="code-note">
+        当前版本 <code>0.0.5</code>。Rust 版每条命令都要写子命令（<code>backup</code> / <code>merge</code>），
+        并行度默认按 CPU 自动决定；从源码构建见 README。
+      </p>
+
+      <h3>当库用（二次开发）</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>toml — Cargo.toml</span><button class="copy" type="button">复制</button></div>
+        <pre><code>[dependencies]
+rust-thanos = "0.0"</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>rust — 嵌入到自己的工具里，顺带保护一块主城</span><button class="copy" type="button">复制</button></div>
+        <pre><code>use rust_thanos::patterns::range::RangePattern;
+use rust_thanos::world::{optimize, OptimizerRequestBuilder};
+
+let request = OptimizerRequestBuilder::new("/path/to/world".into())
+    .output(Some("/path/to/out".into()))
+    .inhabited_threshold_seconds(300)
+    .pattern(Box::new(RangePattern::new(-8, -8, 8, 8))) // 主城 17×17 区块永不裁剪
+    .parallelism(4)
+    .build();
+
+let report = optimize(&request)?;
+println!("扫描 {}，剔除 {}", report.processed_chunks, report.removed_chunks);</code></pre>
+      </div>
+      <p class="code-note">
+        <code>ChunkPattern</code> 可以自己实现（任一命中即保留）；<code>on_error</code> / <code>report_sink</code> / 
+        <code>metrics_sink</code> 三个钩子负责错误、报告与指标；<code>MemoryFS</code> 让同一套管线跑在内存里，适合写测试。
+        合并侧对应 <code>MergeRequestBuilder</code> + <code>merge()</code>。
+      </p>
     </div>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — crates.io（需要 Rust 工具链）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>cargo install rust-thanos      # 装到 ~/.cargo/bin</code></pre>
-    </div>
+    <div class="panel" role="tabpanel" id="panel-java" aria-labelledby="tab-java" tabindex="0" hidden>
+      <p class="lead">
+        适合已经有 JVM 的机器：一个 JAR 走天下。如果你打算把备份逻辑做进自己的 JVM 程序，
+        同一套引擎也发布在 Maven Central，可以直接当库调用。
+      </p>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — 单文件 JAR（需要 JVM 17+）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>curl -LO https://github.com/OrzMC/OrzMCBackup/releases/download/java-v0.3.2/backup.jar
+      <h3>安装（命令行）</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 下载单文件 JAR（需要 JDK 17 或更新）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>curl -LO https://github.com/OrzMC/OrzMCBackup/releases/download/java-v0.3.2/backup.jar
 java -jar backup.jar --version</code></pre>
+      </div>
+      <p class="code-note">Release 页面附 <code>backup.jar.sha256</code>，下载后可以校验一下。</p>
+
+
+      <h3>三条命令上手</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 1. 先看会砍掉多少，不写盘</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar /path/to/world --dry-run --report</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 2. 正式备份（默认阈值 5 分钟，输出打成 zip）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar /path/to/world /path/to/out -t 300 --zip-output</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 3. 合并恢复（先出清单，确认后再落盘）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --dry-run --diff-file audit.csv
+java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --report</code></pre>
+      </div>
+      <p class="code-note">
+        当前版本 <code>0.3.2</code>。省略子命令即为备份；并行度用 <code>--parallelism N</code> 指定（默认 1）。
+        <code>merge --dry-run</code> 和 <code>--diff-file</code>（可审计的回退清单）目前只有 Java 版有。
+      </p>
+
+      <h3>当库用（二次开发）</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>kotlin — build.gradle.kts</span><button class="copy" type="button">复制</button></div>
+        <pre><code>dependencies {
+    implementation("io.github.wangzhizhou:backup-core:0.3.2")
+}</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>kotlin — 嵌入到自己的 JVM 程序，顺带保护一块主城</span><button class="copy" type="button">复制</button></div>
+        <pre><code>import com.jokerhub.orzmc.patterns.RangePattern
+import com.jokerhub.orzmc.world.*
+import java.nio.file.Paths
+
+val report = Optimizer.run(
+    OptimizerRequest(
+        input = Paths.get("/path/to/world"),
+        output = Paths.get("/path/to/out"),
+        filter = FilterOptions(
+            inhabitedThresholdSeconds = 300,
+            extraPatterns = listOf(RangePattern(-8, -8, 8, 8)), // 主城 17×17 区块永不裁剪
+        ),
+    ),
+)
+println("扫描 ${report.processedChunks}，剔除 ${report.removedChunks}")</code></pre>
+      </div>
+      <p class="code-note">
+        <code>ChunkPattern</code> 可以自己实现（任一命中即保留）；<code>Hooks</code> 里能挂错误回调与报告落盘；
+        替换 <code>FileSystem</code> / <code>McaIOFactory</code> 就能把管线跑在内存里（测试、预览都用得上）。
+        合并侧对应 <code>WorldMerger.run(MergeRequest)</code>，和 CLI 是同一套算法。
+      </p>
     </div>
 
-    <p class="code-note">
-      当前版本：Rust <code>0.0.4</code> · Java <code>0.3.2</code>；公式与二进制由
-      <code>release-rust.yml</code> 自动发布到
-      <a href="https://github.com/OrzMC/homebrew-core" target="_blank" rel="noopener">OrzMC/homebrew-core</a>。
-      需要从源码构建或作为库集成，见
-      <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/README.md" target="_blank" rel="noopener">README</a>。
-    </p>
+    <div class="note">
+      两个版本唯一的实际差别在参数细节上：Rust 版启动更快、部署更轻，并行度自动；Java 版多了合并前的
+      <code>--dry-run</code> + 差异清单。备份和合并的结果是同一套逻辑，可以混着用；
+      两个也都发布成了库（Maven Central / crates.io），需要二次开发时不必围着命令行转。
+    </div>
   </div>
 </section>
 
-<section id="quickstart">
+<section id="faq">
   <div class="container">
-    <h2>快速开始</h2>
-    <p class="section-sub">装好之后，三条命令覆盖「预览 → 备份 → 合并恢复」。</p>
+    <h2>常见问题</h2>
+    <p class="section-sub">动手之前最常被问到的几个问题。</p>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — 预览将剔除多少区块（不写盘）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>rust-thanos backup /path/to/world --dry-run --report</code></pre>
-    </div>
+    <details>
+      <summary>会不会把不该删的区块删掉？</summary>
+      <p>
+        判断依据是存档里本来就有的数据：每个区块的玩家停留时间，加上出生点和区块加载器所在的强制加载区块。
+        两者任一命中就保留。默认阈值 300 秒，也就是说玩家在这个区块里待够过 5 分钟，它一定会进备份。
+      </p>
+      <p>
+        另外，损坏或无法解析的文件不会被跳过，而是原样复制进备份并在报告里记录。六档阈值的实测都和原世界
+        逐字节比对过，没有出现预期外的丢失。
+      </p>
+    </details>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — 优化备份（默认阈值 5 分钟）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>rust-thanos backup /path/to/world /path/to/out -t 300 --zip-output</code></pre>
-    </div>
+    <details>
+      <summary>需要停服吗？</summary>
+      <p>
+        建议在服务器停服，或者对一份不在写入的存档副本上跑。备份过程只读输入目录，但它假设 region 文件在读取期间
+        不会被服务端改写。定时任务里最简单的做法是：停服 → 备份 → 启服，或者先快照再备份。
+      </p>
+    </details>
 
-    <div class="codeblock">
-      <div class="codebar"><span>bash — merge 合并恢复（BASE=更早全量，PATCH=优化备份）</span><button class="copy" type="button">复制</button></div>
-      <pre><code>rust-thanos merge BASE PATCH OUTPUT --report --progress-mode global</code></pre>
-    </div>
+    <details>
+      <summary>阈值 <code>-t</code> 设多少合适？</summary>
+      <p>
+        日常用 60 到 120 秒：实测 60 秒就拿到了 91.3% 的剔除率，再往上一档只多省一点体积。
+        默认的 300 秒更保守，适合不确定玩家行为的情况。<code>-t 0</code> 很激进，只适合归档旧周目。
+      </p>
+      <p>第一次用先跑 <code>--dry-run --report</code>，它会告诉你这份世界会保留多少区块、砍掉多少，不写任何文件。</p>
+    </details>
 
-    <p class="code-note">
-      Rust 版的备份要显式写 <code>backup</code> 子命令（<code>rust-thanos backup …</code>）；
-      Java 版省略子命令即为备份（<code>java -jar backup.jar …</code>），<code>merge</code> 两边一致，其余参数相同。
-      先用 <code>--dry-run --report</code> 预览将剔除的区块量；<code>-t 0</code> 会移除所有未被访问的区块，
-      建议保留一份全量备份以便需要时 merge 恢复。从源码构建：
-      <code>java/gradlew -p java :app:shadowJar --no-daemon</code> → <code>java/app/build/libs/backup.jar</code>。
-    </p>
+    <details>
+      <summary>瘦身之后想回到三个月前的地图怎么办？</summary>
+      <p>
+        只要有那份更早的全量备份，就能合回来：<code>merge 全量备份 瘦身备份 输出目录</code>。
+        逐区块取"瘦身备份里有就用它，没有就用全量备份里的"，最终得到一份既包含最新进度、又包含旧地块的完整世界。
+        三个目录必须互不重叠，工具会直接拒绝危险路径。
+      </p>
+      <p>拿不准的话，Java 版可以加 <code>--dry-run --diff-file</code>，先看到"哪些区块会回退到旧版本、回退多久"，确认后再真正落盘。</p>
+    </details>
+
+    <details>
+      <summary>能改保留规则，或者接进我自己的系统吗？</summary>
+      <p>
+        可以，两套实现都是库 + 命令行的双形态。JVM 侧发布在 Maven Central（<code>backup-core</code>），
+        Rust 侧发布在 crates.io（<code>rust-thanos</code>），都公开了配置模型和引擎入口：
+        自定义 <code>ChunkPattern</code> 决定保留哪些区块，挂 hooks 收错误和报告，还能把文件系统换成内存实现跑单测。
+      </p>
+      <p>具体接口见上面的 <a href="#install">安装与使用</a> 里对应实现的「当库用」一节。</p>
+    </details>
+
+    <details>
+      <summary>和 Aternos 的 Thanos 是什么关系？</summary>
+      <p>
+        同一套思路：按活跃时间裁剪区块。OrzMCBackup 在这之上重写了一遍，补了强制加载合并恢复（merge）、
+        损坏数据保留、26.1+ 新格式、报告 / 干跑 / 并行这些运营上用得着的部分，并且有两套独立实现互相校验。
+        允许的差异都记录在
+        <a href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/upstream-divergences.md" target="_blank" rel="noopener">差异对照文档</a>里，对照中发现的问题也已经回馈给上游。
+      </p>
+    </details>
+
+    <details>
+      <summary>支持哪些 Minecraft 版本？</summary>
+      <p>
+        存档格式方面，1.2.1 以来的标准布局和 26.1 之后 <code>dimensions/</code> 嵌套布局都支持；
+        区块压缩支持 RAW、ZLIB、GZIP、LZ4，外部压缩区块由 <code>--remove-unknown</code> 决定留不留。
+        服务端是 PaperMC 还是官方版没有区别，工具只读存档文件。
+      </p>
+    </details>
   </div>
 </section>
 
 <section id="docs">
   <div class="container">
-    <h2>文档导航</h2>
-    <p class="section-sub">从功能梳理到真实案例分析，一站式了解。</p>
-    <div class="doc-grid">
-      <a class="doc" href="doc.html?file=threshold-benchmark-report.md"><div class="t">阈值基准测试报告</div><div class="d">18.6GB 真实世界六档阈值（0/60/…/300s）性能与效果、逐字节完整性验证</div></a>
-      <a class="doc" href="doc.html?file=FEATURES.md"><div class="t">功能点全量梳理</div><div class="d">配置模型、参数速查、CLI / 库用法（v0.3.2）</div></a>
-      <a class="doc" href="doc.html?file=real-world-backup-validation.md"><div class="t">真实世界验证报告</div><div class="d">18.6GB 真实世界、阈值对比、丢失文件分类</div></a>
-      <a class="doc" href="doc.html?file=papermc-map-backup-recovery-case.md"><div class="t">merge 真实恢复案例</div><div class="d">18.64GB 全量 + 2.18GB 优化的槽位级合并算法</div></a>
-      <a class="doc" href="doc.html?file=market-positioning-analysis.md"><div class="t">市场定位与产品化分析</div><div class="d">痛点、竞品对比与商业化方向</div></a>
-      <a class="doc" href="doc.html?file=architecture-review.md"><div class="t">架构与测试审查报告</div><div class="d">P0–P3 改进路线、A1–A20 架构审计、T1–T13 测试审计、C1–C23 CI 审计</div></a>
-      <a class="doc" href="doc.html?file=upstream-comparison.md"><div class="t">与上游 thanos 的差异对照</div><div class="d">功能对照、legacy Forced 打包修复、有意保留的差异与潜在增强</div></a>
-      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/SPEC.md"><div class="t">行为规范（spec/SPEC.md）</div><div class="d">语言无关条款 WOS-1..12：两份实现与上游对照的唯一真值</div></a>
-      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/tree/main/spec/vectors"><div class="t">一致性向量</div><div class="d">24 组字节级输入/期望清单，Java、Rust、上游 PHP 中立比对</div></a>
-      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/upstream-proposals.md"><div class="t">上游改进与分歧</div><div class="d">回馈 aternosorg/thanos 的 PR / issue 与跟踪状态</div></a>
-      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/README.md"><div class="t">README</div><div class="d">快速开始、CLI 参考、作为库使用</div></a>
-      <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/CHANGELOG.md"><div class="t">CHANGELOG</div><div class="d">版本历史与变更说明</div></a>
+    <h2>文档</h2>
+    <p class="section-sub">先用得上的放在前面，想看实现细节的往后翻。</p>
+
+    <div class="docs-group">
+      <h3>使用与验证</h3>
+      <div class="doc-grid">
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/README.md"><div class="t">README</div><div class="d">安装、全部命令行参数、当库使用的示例</div></a>
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/rust/README.md"><div class="t">Rust 域说明</div><div class="d">构建、测试、发布，以及 Rust 库的完整用法</div></a>
+        <a class="doc" href="doc.html?file=threshold-benchmark-report.md"><div class="t">阈值基准测试报告</div><div class="d">同一份世界六档阈值的效果与耗时，含逐字节验证方法</div></a>
+        <a class="doc" href="doc.html?file=real-world-backup-validation.md"><div class="t">真实世界验证报告</div><div class="d">18.6 GB 世界的完整验证记录与丢失文件分类</div></a>
+        <a class="doc" href="doc.html?file=papermc-map-backup-recovery-case.md"><div class="t">合并恢复案例</div><div class="d">18.6 GB 全量 + 2.18 GB 瘦身备份，逐步合并出完整世界</div></a>
+        <a class="doc" href="doc.html?file=FEATURES.md"><div class="t">功能与参数全览</div><div class="d">完整配置模型、参数速查、CLI 与库的用法</div></a>
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/upstream-divergences.md" target="_blank" rel="noopener"><div class="t">与上游 thanos 的差异</div><div class="d">逐项功能对照，哪些一致、哪些是有意不同</div></a>
+      </div>
+    </div>
+
+    <div class="docs-group">
+      <h3>实现与规范</h3>
+      <div class="doc-grid">
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/SPEC.md"><div class="t">行为规范</div><div class="d">语言无关的行为条款，两套实现和上游对照的唯一标准</div></a>
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/tree/main/spec/vectors"><div class="t">一致性向量</div><div class="d">24 组字节级输入与期望清单，三个实现中立比对</div></a>
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/spec/upstream-proposals.md"><div class="t">上游改进与分歧</div><div class="d">回馈给 aternosorg/thanos 的 PR / issue 与跟踪状态</div></a>
+        <a class="doc" href="doc.html?file=architecture-review.md"><div class="t">架构与测试审查</div><div class="d">架构、测试、CI 三方面的审查结论与改进路线</div></a>
+        <a class="doc" href="https://github.com/OrzMC/OrzMCBackup/blob/main/CHANGELOG.md"><div class="t">CHANGELOG</div><div class="d">版本历史与每次变更的说明</div></a>
+      </div>
     </div>
   </div>
 </section>
@@ -538,10 +775,10 @@ java -jar backup.jar --version</code></pre>
 <section style="border-bottom: none; padding-top: 24px;">
   <div class="container">
     <div class="cta-banner">
-      <h2>优化你的世界备份</h2>
-      <p>从 18.6 GB 到 2.2 GB，数据零非预期丢失——<code>brew install rust-thanos</code> 就能开始。</p>
+      <h2>先跑一次预览，再决定装不装</h2>
+      <p><code>--dry-run</code> 不写任何文件，只告诉你这份世界能省下多少——省下来的数字通常比文案更有说服力。</p>
       <div class="cta-row" style="justify-content: center; margin-bottom: 0;">
-        <a class="btn btn-solid btn-lg" href="#install">开始使用</a>
+        <a class="btn btn-solid btn-lg" href="#install">选版本安装</a>
         <a class="btn btn-lg" href="https://github.com/OrzMC/OrzMCBackup/releases" target="_blank" rel="noopener">下载 Release</a>
       </div>
     </div>
@@ -569,7 +806,47 @@ java -jar backup.jar --version</code></pre>
 
 <script>
 (function () {
-  // 复制命令
+  // ---------- 按实现切换（Rust / Java） ----------
+  var tabs = Array.prototype.slice.call(document.querySelectorAll('.tab[role="tab"]'));
+  var STORAGE_KEY = 'orzmc-backup-impl';
+
+  function panelFor(tab) { return document.getElementById(tab.getAttribute('aria-controls')); }
+
+  function select(impl, focusTab) {
+    tabs.forEach(function (tab) {
+      var on = tab.dataset.impl === impl;
+      var panel = panelFor(tab);
+      tab.setAttribute('aria-selected', on ? 'true' : 'false');
+      tab.tabIndex = on ? 0 : -1;
+      if (panel) { panel.hidden = !on; }
+      if (on && focusTab) { tab.focus(); }
+    });
+    try { localStorage.setItem(STORAGE_KEY, impl); } catch (e) {}
+  }
+
+  if (tabs.length) {
+    var saved = null;
+    try { saved = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+    var hash = (location.hash || '').replace('#', '');
+    var initial = (hash === 'java' || hash === 'rust') ? hash
+      : (saved === 'java' || saved === 'rust') ? saved
+      : (tabs[0] && tabs[0].dataset.impl) || 'rust';
+    select(initial, false);
+
+    tabs.forEach(function (tab, i) {
+      tab.addEventListener('click', function () { select(tab.dataset.impl, false); });
+      tab.addEventListener('keydown', function (e) {
+        var next = null;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { next = tabs[(i + 1) % tabs.length]; }
+        if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { next = tabs[(i - 1 + tabs.length) % tabs.length]; }
+        if (e.key === 'Home') { next = tabs[0]; }
+        if (e.key === 'End') { next = tabs[tabs.length - 1]; }
+        if (next) { e.preventDefault(); select(next.dataset.impl, true); }
+      });
+    });
+  }
+
+  // ---------- 复制命令 ----------
   document.querySelectorAll('.copy').forEach(function (btn) {
     btn.addEventListener('click', function () {
       var code = btn.parentElement.nextElementSibling.querySelector('code');
@@ -588,7 +865,8 @@ java -jar backup.jar --version</code></pre>
       }
     });
   });
-  // 移动端菜单
+
+  // ---------- 移动端菜单 ----------
   var burger = document.querySelector('.hamburger');
   var links = document.getElementById('navLinks');
   if (burger) {

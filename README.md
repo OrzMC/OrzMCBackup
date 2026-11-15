@@ -106,7 +106,7 @@ Minecraft 区块一旦生成就不会自动消失。玩家探索、跑图、飞�
 | **GitHub Release**（Java CLI） | 从 [`java-v0.3.2`](https://github.com/OrzMC/OrzMCBackup/releases) 下载 `backup.jar`（附 `SHA256SUMS`） | 有 JVM 17+，想要单文件 |
 | **Maven Central**（库） | `io.github.wangzhizhou:backup-core:0.3.2` | 集成进自己的工具/JVM 服务 |
 
-> 当前版本：Java `0.3.2` · Rust `0.0.4`。两个 CLI 的命令行接口一致（同一份 `spec/SPEC.md` 约束），
+> 当前版本：Java `0.3.2` · Rust `0.0.5`。两个 CLI 的命令行接口一致（同一份 `spec/SPEC.md` 约束），
 > 按运行环境挑一个即可：Rust 版启动快、单二进制无依赖；Java 版与库共用同一套引擎。
 
 ### 构建（从源码）
