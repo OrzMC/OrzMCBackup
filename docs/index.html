@@ -511,22 +511,90 @@ footer a:hover { color: var(--green); }
 <section id="install">
   <div class="container">
     <h2>安装与使用</h2>
-    <p class="section-sub">两个版本命令和参数一致，按你的环境挑一个。选完之后这一屏只显示这一种装法。</p>
+    <p class="section-sub">两个版本命令和参数一致，按你的环境挑一个。默认给你看 Java 版，选完之后这一屏只显示这一种装法。</p>
 
     <div class="tabs" role="tablist" aria-label="选择实现">
-      <button class="tab" type="button" role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="true" data-impl="rust">
-        <span class="tab-name">Rust 版 <span class="pill">推荐</span></span>
-        <span class="tab-desc">单个可执行文件，不用装 JVM，启动快</span>
+      <button class="tab" type="button" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="true" data-impl="java">
+        <span class="tab-name">Java 版 <span class="pill">推荐</span></span>
+        <span class="tab-desc">JDK 17+ 就能跑，一个 JAR 跨平台；插件与二次开发也用它</span>
       </button>
-      <button class="tab" type="button" role="tab" id="tab-java" aria-controls="panel-java" aria-selected="false" data-impl="java" tabindex="-1">
-        <span class="tab-name">Java 版</span>
-        <span class="tab-desc">一个 JAR，机器上有 JDK 17+ 就能跑；也能当库用</span>
+      <button class="tab" type="button" role="tab" id="tab-rust" aria-controls="panel-rust" aria-selected="false" data-impl="rust" tabindex="-1">
+        <span class="tab-name">Rust 版</span>
+        <span class="tab-desc">单个可执行文件，不用装 JVM，启动快</span>
       </button>
     </div>
 
-    <div class="panel" role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" tabindex="0">
+    <div class="panel" role="tabpanel" id="panel-java" aria-labelledby="tab-java" tabindex="0">
       <p class="lead">
-        适合把备份写进脚本或定时任务：装完就是一个 <code>rust-thanos</code> 命令，没有运行时依赖，冷启动几乎不占时间。
+        推荐先看这个：机器上有 JDK 17+ 就能跑，Windows / Linux / macOS 都是同一个 <code>backup.jar</code>，
+        不用再装别的东西。写 Paper 插件、面板后端或者自己的备份工具时，同一套引擎也在 Maven Central，
+        可以直接当库调用。
+      </p>
+
+      <h3>安装（命令行）</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 下载单文件 JAR（需要 JDK 17 或更新）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>curl -LO https://github.com/OrzMC/OrzMCBackup/releases/download/java-v0.3.2/backup.jar
+java -jar backup.jar --version</code></pre>
+      </div>
+      <p class="code-note">Release 页面附 <code>backup.jar.sha256</code>，下载后可以校验一下。</p>
+
+      <h3>三条命令上手</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 1. 先看会砍掉多少，不写盘</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar /path/to/world --dry-run --report</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 2. 正式备份（默认阈值 5 分钟，输出打成 zip）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar /path/to/world /path/to/out -t 300 --zip-output</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>bash — 3. 合并恢复（先出清单，确认后再落盘）</span><button class="copy" type="button">复制</button></div>
+        <pre><code>java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --dry-run --diff-file audit.csv
+java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --report</code></pre>
+      </div>
+      <p class="code-note">
+        当前版本 <code>0.3.2</code>。省略子命令即为备份；并行度用 <code>--parallelism N</code> 指定（默认 1）。
+        <code>merge --dry-run</code> 和 <code>--diff-file</code>（可审计的回退清单）目前只有 Java 版有。
+      </p>
+
+      <h3>当库用（二次开发）</h3>
+      <div class="codeblock">
+        <div class="codebar"><span>kotlin — build.gradle.kts</span><button class="copy" type="button">复制</button></div>
+        <pre><code>dependencies {
+    implementation("io.github.wangzhizhou:backup-core:0.3.2")
+}</code></pre>
+      </div>
+      <div class="codeblock">
+        <div class="codebar"><span>kotlin — 嵌入到自己的 JVM 程序，顺带保护一块主城</span><button class="copy" type="button">复制</button></div>
+        <pre><code>import com.jokerhub.orzmc.patterns.RangePattern
+import com.jokerhub.orzmc.world.*
+import java.nio.file.Paths
+
+val report = Optimizer.run(
+    OptimizerRequest(
+        input = Paths.get("/path/to/world"),
+        output = Paths.get("/path/to/out"),
+        filter = FilterOptions(
+            inhabitedThresholdSeconds = 300,
+            extraPatterns = listOf(RangePattern(-8, -8, 8, 8)), // 主城 17×17 区块永不裁剪
+        ),
+    ),
+)
+println("扫描 ${report.processedChunks}，剔除 ${report.removedChunks}")</code></pre>
+      </div>
+      <p class="code-note">
+        在 Paper 插件里也能直接用：加一条依赖，把备份调用放进自己的调度里（这类文件 IO 别放在服务端主线程）。
+        自定义 <code>ChunkPattern</code> 决定保留哪些区块；<code>Hooks</code> 里能挂错误回调与报告落盘；
+        替换 <code>FileSystem</code> / <code>McaIOFactory</code> 就能把管线跑在内存里，写单测很方便。
+        合并侧对应 <code>WorldMerger.run(MergeRequest)</code>，和 CLI 是同一套算法。
+      </p>
+    </div>
+
+    <div class="panel" role="tabpanel" id="panel-rust" aria-labelledby="tab-rust" tabindex="0" hidden>
+      <p class="lead">
+        适合把备份交给定时任务、又不想在服务器上装 JVM：装完就是一个 <code>rust-thanos</code> 命令，
+        没有运行时依赖，启动几乎不占时间。
       </p>
 
       <h3>安装</h3>
@@ -592,76 +660,10 @@ println!("扫描 {}，剔除 {}", report.processed_chunks, report.removed_chunks
       </p>
     </div>
 
-    <div class="panel" role="tabpanel" id="panel-java" aria-labelledby="tab-java" tabindex="0" hidden>
-      <p class="lead">
-        适合已经有 JVM 的机器：一个 JAR 走天下。如果你打算把备份逻辑做进自己的 JVM 程序，
-        同一套引擎也发布在 Maven Central，可以直接当库调用。
-      </p>
-
-      <h3>安装（命令行）</h3>
-      <div class="codeblock">
-        <div class="codebar"><span>bash — 下载单文件 JAR（需要 JDK 17 或更新）</span><button class="copy" type="button">复制</button></div>
-        <pre><code>curl -LO https://github.com/OrzMC/OrzMCBackup/releases/download/java-v0.3.2/backup.jar
-java -jar backup.jar --version</code></pre>
-      </div>
-      <p class="code-note">Release 页面附 <code>backup.jar.sha256</code>，下载后可以校验一下。</p>
-
-
-      <h3>三条命令上手</h3>
-      <div class="codeblock">
-        <div class="codebar"><span>bash — 1. 先看会砍掉多少，不写盘</span><button class="copy" type="button">复制</button></div>
-        <pre><code>java -jar backup.jar /path/to/world --dry-run --report</code></pre>
-      </div>
-      <div class="codeblock">
-        <div class="codebar"><span>bash — 2. 正式备份（默认阈值 5 分钟，输出打成 zip）</span><button class="copy" type="button">复制</button></div>
-        <pre><code>java -jar backup.jar /path/to/world /path/to/out -t 300 --zip-output</code></pre>
-      </div>
-      <div class="codeblock">
-        <div class="codebar"><span>bash — 3. 合并恢复（先出清单，确认后再落盘）</span><button class="copy" type="button">复制</button></div>
-        <pre><code>java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --dry-run --diff-file audit.csv
-java -jar backup.jar merge 更早的全量备份 瘦身备份 输出目录 --report</code></pre>
-      </div>
-      <p class="code-note">
-        当前版本 <code>0.3.2</code>。省略子命令即为备份；并行度用 <code>--parallelism N</code> 指定（默认 1）。
-        <code>merge --dry-run</code> 和 <code>--diff-file</code>（可审计的回退清单）目前只有 Java 版有。
-      </p>
-
-      <h3>当库用（二次开发）</h3>
-      <div class="codeblock">
-        <div class="codebar"><span>kotlin — build.gradle.kts</span><button class="copy" type="button">复制</button></div>
-        <pre><code>dependencies {
-    implementation("io.github.wangzhizhou:backup-core:0.3.2")
-}</code></pre>
-      </div>
-      <div class="codeblock">
-        <div class="codebar"><span>kotlin — 嵌入到自己的 JVM 程序，顺带保护一块主城</span><button class="copy" type="button">复制</button></div>
-        <pre><code>import com.jokerhub.orzmc.patterns.RangePattern
-import com.jokerhub.orzmc.world.*
-import java.nio.file.Paths
-
-val report = Optimizer.run(
-    OptimizerRequest(
-        input = Paths.get("/path/to/world"),
-        output = Paths.get("/path/to/out"),
-        filter = FilterOptions(
-            inhabitedThresholdSeconds = 300,
-            extraPatterns = listOf(RangePattern(-8, -8, 8, 8)), // 主城 17×17 区块永不裁剪
-        ),
-    ),
-)
-println("扫描 ${report.processedChunks}，剔除 ${report.removedChunks}")</code></pre>
-      </div>
-      <p class="code-note">
-        <code>ChunkPattern</code> 可以自己实现（任一命中即保留）；<code>Hooks</code> 里能挂错误回调与报告落盘；
-        替换 <code>FileSystem</code> / <code>McaIOFactory</code> 就能把管线跑在内存里（测试、预览都用得上）。
-        合并侧对应 <code>WorldMerger.run(MergeRequest)</code>，和 CLI 是同一套算法。
-      </p>
-    </div>
-
     <div class="note">
-      两个版本唯一的实际差别在参数细节上：Rust 版启动更快、部署更轻，并行度自动；Java 版多了合并前的
-      <code>--dry-run</code> + 差异清单。备份和合并的结果是同一套逻辑，可以混着用；
-      两个也都发布成了库（Maven Central / crates.io），需要二次开发时不必围着命令行转。
+      两者行为和参数一致，按机器挑就行：Java 版跨平台、插件和二次开发都走它，还多一个合并前的
+      <code>--dry-run</code> + 差异清单；Rust 版单文件部署、启动更快，并行度自动。
+      备份和合并的结果是同一套逻辑，两个版本可以混着用；库分发在 Maven Central 与 crates.io。
     </div>
   </div>
 </section>
@@ -830,7 +832,7 @@ println("扫描 ${report.processedChunks}，剔除 ${report.removedChunks}")</co
     var hash = (location.hash || '').replace('#', '');
     var initial = (hash === 'java' || hash === 'rust') ? hash
       : (saved === 'java' || saved === 'rust') ? saved
-      : (tabs[0] && tabs[0].dataset.impl) || 'rust';
+      : (tabs[0] && tabs[0].dataset.impl) || 'java';
     select(initial, false);
 
     tabs.forEach(function (tab, i) {
